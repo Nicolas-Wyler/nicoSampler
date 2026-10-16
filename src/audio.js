@@ -196,6 +196,7 @@ export class AudioController {
     this.send({ type: "panic" });
   }
   settings(state) {
+    this.send({ type: "inputGain", db: state.record?.gain_db ?? 0 });
     this.send({ type: "settings", master: state.master, fx: state.fx });
   }
   processed(s) {

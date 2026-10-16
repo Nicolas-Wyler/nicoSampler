@@ -1,4 +1,4 @@
-const CACHE = "nico-sampler-classic-v2-cef0feca7aef";
+const CACHE = "nico-sampler-classic-v2-011d1c273a8d";
 const ASSETS = [
   "./",
   "./index.html",
@@ -52,24 +52,54 @@ const ASSETS = [
   "./THIRD_PARTY_NOTICES.md",
   "./LICENSE",
 ];
-async function cacheAssets(cache, missingOnly = false) {
+async function cacheAssets(cache, missingOnly = false, progress = () => {}) {
+  let completed = 0;
   for (let offset = 0; offset < ASSETS.length; offset += 4) {
-    await Promise.all(ASSETS.slice(offset, offset + 4).map(async (asset) => {
-      const url = new URL(asset, self.location.href);
-      if (missingOnly && await cache.match(url, { ignoreVary: true })) return;
-      for (let attempt = 0; ; attempt++) {
-        try { await cache.add(new Request(url, { cache: "reload" })); return; }
-        catch (error) { if (attempt >= 2) throw error; }
-      }
-    }));
+    await Promise.all(
+      ASSETS.slice(offset, offset + 4).map(async (asset) => {
+        const url = new URL(asset, self.location.href);
+        if (missingOnly && (await cache.match(url, { ignoreVary: true }))) {
+          progress(++completed, ASSETS.length);
+          return;
+        }
+        for (let attempt = 0; ; attempt++) {
+          try {
+            await cache.add(new Request(url, { cache: "reload" }));
+            progress(++completed, ASSETS.length);
+            return;
+          } catch (error) {
+            if (attempt >= 2) throw error;
+          }
+        }
+      }),
+    );
   }
 }
-self.addEventListener("install", (e) =>
-  e.waitUntil(
-    caches
-      .open(CACHE)
-      .then((c) => cacheAssets(c))
-      .then(() => self.skipWaiting()),
+async function manualUpdateSupported() {
+  const active = self.registration?.active;
+  if (!active) return false;
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    const timer = setTimeout(() => {
+      channel.port1.close();
+      resolve(false);
+    }, 2000);
+    channel.port1.onmessage = ({ data }) => {
+      clearTimeout(timer);
+      channel.port1.close();
+      resolve(data.manualUpdates === true);
+    };
+    active.postMessage({ type: "OFFLINE_STATUS" }, [channel.port2]);
+  });
+}
+self.addEventListener("install", (event) =>
+  event.waitUntil(
+    (async () => {
+      // One-time migration from older automatic workers, then wait for user consent.
+      if (await manualUpdateSupported()) return;
+      await cacheAssets(await caches.open(CACHE));
+      await self.skipWaiting();
+    })(),
   ),
 );
 self.addEventListener("activate", (e) =>
@@ -93,7 +123,13 @@ self.addEventListener("fetch", (e) => {
   )
     e.respondWith(
       caches
-        .match(e.request, { cacheName: CACHE, ignoreVary: true })
+        .match(e.request, {
+          cacheName: CACHE,
+          ignoreVary: true,
+          ignoreSearch: new URL(e.request.url).pathname.startsWith(
+            new URL("./icons/", self.location.href).pathname,
+          ),
+        })
         .then(async (hit) => {
           if (hit) return hit;
           const url = new URL(e.request.url);
@@ -115,13 +151,36 @@ self.addEventListener("fetch", (e) => {
 });
 
 self.addEventListener("message", (event) => {
+  if (event.data?.type === "APPLY_UPDATE") {
+    event.waitUntil(
+      (async () => {
+        const port = event.ports[0];
+        try {
+          await cacheAssets(
+            await caches.open(CACHE),
+            false,
+            (completed, total) =>
+              port?.postMessage({ progress: completed / total }),
+          );
+          port?.postMessage({ done: true });
+          await self.skipWaiting();
+        } catch (error) {
+          port?.postMessage({ error: error.message });
+        }
+      })(),
+    );
+    return;
+  }
   if (event.data?.type !== "OFFLINE_STATUS") return;
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE);
       if (event.data.repair) {
-        try { await cacheAssets(cache, true); }
-        catch { /* Report incomplete state below so the user can retry. */ }
+        try {
+          await cacheAssets(cache, true);
+        } catch {
+          /* Report incomplete state below so the user can retry. */
+        }
       }
       const present = await Promise.all(
         ASSETS.map((asset) =>
@@ -129,6 +188,8 @@ self.addEventListener("message", (event) => {
         ),
       );
       event.ports[0]?.postMessage({
+        version: CACHE,
+        manualUpdates: true,
         ready: present.every(Boolean),
         cached: present.filter(Boolean).length,
         total: ASSETS.length,

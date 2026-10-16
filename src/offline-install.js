@@ -1,65 +1,168 @@
 const badge = document.getElementById("offline-status");
-let busy = false;
+const button = document.getElementById("app-update");
+const workerURL = new URL("../sw.js", import.meta.url);
+let registration,
+  preparing = false,
+  checking = false,
+  updating = false,
+  hideTimer;
+function placeButton() {
+  const main = document.getElementById("sampler");
+  const landing = main.hidden;
+  button.classList.toggle("landing-update", landing);
+  if (landing) document.body.append(button);
+  else
+    document
+      .querySelector(".program-header")
+      .insertBefore(button, document.querySelector(".output"));
+}
+placeButton();
+new MutationObserver(placeButton).observe(document.getElementById("sampler"), {
+  attributes: true,
+  attributeFilter: ["hidden"],
+});
+function show(text, enabled = false) {
+  clearTimeout(hideTimer);
+  button.hidden = false;
+  button.disabled = !enabled;
+  button.textContent = text;
+}
+function rpc(worker, message, progress) {
+  return new Promise((resolve, reject) => {
+    const channel = new MessageChannel();
+    const timer = setTimeout(() => {
+      channel.port1.close();
+      reject(Error("Offline download timed out"));
+    }, 180000);
+    channel.port1.onmessage = ({ data }) => {
+      if ("progress" in data) {
+        progress?.(data.progress);
+        return;
+      }
+      clearTimeout(timer);
+      channel.port1.close();
+      data.error ? reject(Error(data.error)) : resolve(data);
+    };
+    worker.postMessage(message, [channel.port2]);
+  });
+}
+async function waitState(worker, state) {
+  if (worker.state === state) return;
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => done(Error("Update not ready")), 180000);
+    const done = (error) => {
+      clearTimeout(timer);
+      worker.removeEventListener("statechange", check);
+      error ? reject(error) : resolve();
+    };
+    const check = () => {
+      if (worker.state === state) done();
+      else if (worker.state === "redundant")
+        done(Error("Download interrupted"));
+    };
+    worker.addEventListener("statechange", check);
+    check();
+  });
+}
+async function checkUpdates() {
+  if (!registration || preparing || checking || updating) return;
+  if (!navigator.onLine) {
+    show("Offline");
+    return;
+  }
+  checking = true;
+  clearTimeout(hideTimer);
+  button.hidden = false;
+  button.disabled = true;
+  button.innerHTML =
+    '<span class="update-spinner" aria-hidden="true">◌</span> Checking…';
+  try {
+    const local = await rpc(registration.active, { type: "OFFLINE_STATUS" });
+    const response = await fetch(workerURL, { cache: "no-store" });
+    if (!response.ok) throw Error("Update check unavailable");
+    const remote = /const CACHE = "([^"]+)"/.exec(await response.text())?.[1];
+    if (!remote) throw Error("Invalid update response");
+    if (remote !== local.version) show("Update", true);
+    else {
+      show("No updates found");
+      hideTimer = setTimeout(() => {
+        if (!updating) button.hidden = true;
+      }, 3000);
+    }
+  } catch (error) {
+    show(
+      !navigator.onLine || error instanceof TypeError
+        ? "Offline"
+        : "Update check unavailable",
+    );
+  } finally {
+    checking = false;
+  }
+}
+async function saveBeforeUpdate() {
+  const promises = [];
+  window.dispatchEvent(
+    new CustomEvent("sampler-before-update", {
+      detail: { waitUntil: (p) => promises.push(p) },
+    }),
+  );
+  await Promise.all(promises);
+}
+async function applyUpdate() {
+  if (updating || button.disabled) return;
+  updating = true;
+  try {
+    await saveBeforeUpdate();
+    show("Updating 0%");
+    button.style.setProperty("--progress", "0%");
+    await registration.update();
+    let worker = registration.waiting || registration.installing;
+    if (worker) {
+      await waitState(worker, "installed");
+      await rpc(worker, { type: "APPLY_UPDATE" }, (fraction) => {
+        const percent = Math.round(fraction * 100);
+        show(`Updating ${percent}%`);
+        button.style.setProperty("--progress", percent + "%");
+      });
+      await waitState(worker, "activated");
+    }
+    show("Update complete");
+    button.style.setProperty("--progress", "100%");
+    await saveBeforeUpdate();
+    location.reload();
+  } catch (error) {
+    show(error.message + " · Retry", true);
+    button.style.setProperty("--progress", "0%");
+  } finally {
+    updating = false;
+  }
+}
+button.addEventListener("click", () => void applyUpdate());
 async function prepare() {
-  if (busy) return;
-  busy = true;
+  if (preparing) return;
+  preparing = true;
   badge.hidden = false;
   delete badge.dataset.error;
   badge.textContent = "Downloading offline copy… Keep this app open";
   try {
     if (!("serviceWorker" in navigator))
       throw Error("Offline installation unavailable");
-    const registration = await navigator.serviceWorker.register(
-      new URL("../sw.js", import.meta.url),
-      { updateViaCache: "none" },
-    );
-    await registration.update().catch(() => {});
-    const worker =
-      registration.installing || registration.waiting || registration.active;
-    if (!worker) throw Error("Open online to install");
-    if (worker.state !== "activated") {
-      await new Promise((resolve, reject) => {
-        const timer = setTimeout(
-          () => reject(Error("Download incomplete")),
-          180000,
-        );
-        const check = () => {
-          if (worker.state === "activated") {
-            clearTimeout(timer);
-            worker.removeEventListener("statechange", check);
-            resolve();
-          } else if (worker.state === "redundant") {
-            clearTimeout(timer);
-            worker.removeEventListener("statechange", check);
-            reject(Error("Download interrupted"));
-          }
-        };
-        worker.addEventListener("statechange", check);
-        check();
-      });
+    registration = await navigator.serviceWorker.register(workerURL, {
+      updateViaCache: "none",
+    });
+    if (!registration.active) {
+      const worker = registration.installing || registration.waiting;
+      if (!worker) throw Error("Open online to install");
+      await waitState(worker, "activated");
     }
-    const ready = await navigator.serviceWorker.ready;
-    const result = await new Promise((resolve, reject) => {
-      const channel = new MessageChannel();
-      const timer = setTimeout(
-        () => reject(Error("Offline verification timed out")),
-        180000,
-      );
-      channel.port1.onmessage = ({ data }) => {
-        clearTimeout(timer);
-        channel.port1.close();
-        resolve(data);
-      };
-      (ready.active || worker).postMessage({ type: "OFFLINE_STATUS", repair: navigator.onLine }, [
-        channel.port2,
-      ]);
+    const result = await rpc(registration.active, {
+      type: "OFFLINE_STATUS",
+      repair: navigator.onLine,
     });
     if (!result.ready) throw Error("Offline download incomplete");
     await navigator.storage?.persist?.().catch(() => false);
     badge.textContent =
       "✓ Ready offline — app and examples saved on this device";
-    badge.title =
-      "Offline storage verified. Tap to dismiss. iOS may remove website data if device storage is cleared.";
     badge.onclick = () => {
       badge.hidden = true;
     };
@@ -70,12 +173,24 @@ async function prepare() {
     badge.dataset.error = "true";
     badge.textContent = "Offline copy not ready — connect and tap to retry";
     badge.title = error.message;
-    badge.onclick = prepare;
+    badge.onclick = () => void prepare();
   } finally {
-    busy = false;
+    preparing = false;
+    void checkUpdates();
   }
 }
 window.addEventListener("online", () => {
   if (badge.dataset.error) void prepare();
+  else void checkUpdates();
 });
+window.addEventListener("offline", () => {
+  if (!updating) show("Offline");
+});
+window.addEventListener("pageshow", () => void checkUpdates());
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) void checkUpdates();
+});
+setInterval(() => {
+  if (!document.hidden) void checkUpdates();
+}, 300000);
 void prepare();

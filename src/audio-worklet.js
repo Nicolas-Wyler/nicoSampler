@@ -13,6 +13,7 @@ class SamplerProcessor extends AudioWorkletProcessor {
     this.recIndex = 0;
     this.recordFrames = 0;
     this.maxFrames = sampleRate * 180;
+    this.inputGain = 1;
     this.peak = 0;
     this.port.onmessage = (e) => this.message(e.data);
     this.port.postMessage({ type: "ready" });
@@ -20,7 +21,10 @@ class SamplerProcessor extends AudioWorkletProcessor {
   message(m) {
     try {
       const a = this.engine.api;
-      if (m.type === "inputMode") {
+      if (m.type === "inputGain") {
+        this.inputGain =
+          10 ** (Math.max(-24, Math.min(24, Number(m.db) || 0)) / 20);
+      } else if (m.type === "inputMode") {
         this.recChannels = m.mode;
         this.peak = 0;
       } else if (m.type === "threshold") {
@@ -97,6 +101,8 @@ class SamplerProcessor extends AudioWorkletProcessor {
         if (this.recChannels === "Mono L") r = l;
         else if (this.recChannels === "Mono R") l = r;
         else if (this.recChannels === "Mono mix") l = r = (l + r) / 2;
+        l *= this.inputGain;
+        r *= this.inputGain;
         inputPeak = Math.max(inputPeak, Math.abs(l), Math.abs(r));
         if (
           this.armed &&

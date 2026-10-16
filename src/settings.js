@@ -4,6 +4,7 @@ const DEFAULT_RECORD = {
   device: "",
   mode: "Stereo",
   threshold: -24,
+  gain_db: 0,
   sample_rate: 44100,
   bit_depth: 16,
 };
@@ -42,6 +43,7 @@ export function normalizePreferences(raw = {}) {
     ]),
   );
   record.source = string(record.source, "recording source", "mic");
+  record.gain_db = number(record.gain_db, -24, 24, "recording gain", 0);
   record.device = string(record.device, "recording device");
   if (
     !["mic", "system"].includes(record.source) ||

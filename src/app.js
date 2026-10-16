@@ -474,6 +474,7 @@ function restoreSavedView() {
   ui.restoreViewSettings?.(state.viewSettings);
 }
 function paintSettings() {
+  setValue("record-gain", state.record.gain_db ?? 0);
   $("master").value = Math.round(state.master * 100);
   $("master-value").value = Math.round(state.master * 100) + "%";
   syncMasterKnob();
@@ -4217,3 +4218,22 @@ $("resample-dialog").addEventListener(
   },
   true,
 );
+
+listen("record-gain", "input", (e) => {
+  state.record.gain_db = Math.max(-24, Math.min(24, Number(e.target.value)));
+  audio.send({ type: "inputGain", db: state.record.gain_db });
+  changed();
+});
+window.addEventListener("sampler-before-update", (event) => {
+  event.detail.waitUntil(
+    (async () => {
+      if (recording || armed || finishingRecording)
+        throw Error("Stop recording before updating");
+      captureViewSettings();
+      clearTimeout(saveTimer);
+      await saveChain.catch(() => {});
+      await saveRecovery(structuredClone(state));
+      approvedClose = true;
+    })(),
+  );
+});

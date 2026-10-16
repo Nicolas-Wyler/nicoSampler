@@ -62,7 +62,7 @@ export function initMasterKnob() {
           : Number(input.value) + steps[event.key],
     );
   });
-  button.addEventListener("dblclick", () => set(100));
+  button.addEventListener("dblclick", () => set(50));
   input.addEventListener("input", syncMasterKnob);
   syncMasterKnob();
 }

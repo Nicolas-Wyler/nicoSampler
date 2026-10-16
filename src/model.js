@@ -104,7 +104,7 @@ export function session() {
       { time: 0.3, feedback: 0 },
     ],
     octave: 0,
-    master: 1,
+    master: 0.5,
     record: {
       source: "mic",
       device: "",
