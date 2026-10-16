@@ -97,6 +97,7 @@ const history = new Map(),
   held = new Map(),
   pointerNotes = new Map(),
   pressedNotes = new Set(),
+  pressedChannels = new Map(),
   noteEpoch = new Map();
 let panicEpoch = 0,
   midiMutedUntil = 0,
@@ -898,6 +899,8 @@ async function startNote(note, velocity = 127, channel = 0, previewId = null) {
   if (!audio.node || audio.context.state !== "running") await enable();
   if (noteEpoch.get(key) !== ticket || panicTicket !== panicEpoch) return;
   audio.on(current(), note, velocity, channel, previewId);
+  if (!pressedChannels.has(note)) pressedChannels.set(note, new Set());
+  pressedChannels.get(note).add(channel);
   pressedNotes.add(note);
   paintPressed();
 }
@@ -905,7 +908,12 @@ function releaseNote(note, channel = 0) {
   const key = channel + ":" + note;
   noteEpoch.set(key, (noteEpoch.get(key) ?? 0) + 1);
   audio.off(note, channel);
-  pressedNotes.delete(note);
+  const channels = pressedChannels.get(note);
+  channels?.delete(channel);
+  if (!channels?.size) {
+    pressedChannels.delete(note);
+    pressedNotes.delete(note);
+  }
   paintPressed();
 }
 function releasePointer(id) {
@@ -920,6 +928,7 @@ function releaseHeld() {
   held.clear();
   for (const id of pointerNotes.keys()) releasePointer(id);
   pressedNotes.clear();
+  pressedChannels.clear();
   paintPressed();
 }
 function stopAll() {
@@ -3530,13 +3539,9 @@ function audioEvent(m) {
     }
     updateMeters(m.peak, m.inputPeak);
     $("engine-status").textContent = `${m.voices} voices · C++ / WASM`;
-    const notes = new Set(m.notes);
-    for (const n of pressedNotes) notes.add(n);
-    document
-      .querySelectorAll(".piano-key")
-      .forEach((el) =>
-        el.classList.toggle("pressed", notes.has(Number(el.dataset.note))),
-      );
+    // Sounding voices can outlive key-up (one-shots, release tails and sustain).
+    // Piano highlights represent input presses only; row LEDs still show playback.
+    paintPressed();
     document
       .querySelectorAll("[data-id]")
       .forEach((el) =>

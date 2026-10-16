@@ -69,3 +69,5 @@ Bank and Program files include persistent recorder, MIDI, octave, master/FX, key
 Save → Resample renders selected samples with processing applied, to WAV or MP3. It exports audio only, not containers. Multiple renders download as one ZIP. Matching source formats supply defaults; mixed formats offer per-source settings or a common chosen format. WAV supports the low rates and 12-bit precision. MP3 has its own supported rates/bitrates and does not represent a PCM bit-depth choice.
 
 Use downloaded ZIP backups to move between browsers/computers. Browser-local recovery and the sampler clipboard are tied to origin, port and profile; private browsing or clearing browser data can remove them.
+
+Piano key highlights follow input key-down/key-up, independently of sounding voices. One-shots, sustain and release tails can continue after the highlight clears; row playback indicators still show the sounding samples. A key stays highlighted while another input channel or the on-screen keyboard still holds that note.

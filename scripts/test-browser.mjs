@@ -65,16 +65,24 @@ try {
         .evaluate((e) => [
           e.getBoundingClientRect().width,
           document.querySelector("#table-wrap").clientWidth -
-            (parseFloat(getComputedStyle(document.querySelector("#table-wrap")).paddingRight) || 0),
+            (parseFloat(
+              getComputedStyle(document.querySelector("#table-wrap"))
+                .paddingRight,
+            ) || 0),
         ]);
       assert.ok(size[0] >= size[1] - 1);
       assert.match(await page.locator("#table-head").textContent(), /Sample/);
       // A full kit creates a vertical scrollbar; it must not intercept Level.
       await page.waitForFunction(() => {
-        const dial = document.querySelector("#sample-table tr .level-cell .dial");
+        const dial = document.querySelector(
+          "#sample-table tr .level-cell .dial",
+        );
         if (!dial) return false;
         const r = dial.getBoundingClientRect();
-        const hit = document.elementFromPoint(r.right - 1, r.top + r.height / 2);
+        const hit = document.elementFromPoint(
+          r.right - 1,
+          r.top + r.height / 2,
+        );
         return hit?.closest(".knob") === dial.closest(".knob");
       });
       await page.locator("#enable-audio").click();
@@ -114,6 +122,27 @@ try {
       await browser.close();
     }
   }
+  await new Promise((resolve, reject) => {
+    const regression = spawn(
+      process.execPath,
+      ["tests/midi-highlight-browser.mjs"],
+      {
+        cwd: root,
+        env: {
+          ...process.env,
+          SAMPLER_URL: origin,
+          PLAYWRIGHT_CHROMIUM_EXECUTABLE: process.env.CHROME_PATH ?? "",
+        },
+        stdio: "inherit",
+      },
+    );
+    regression.once("error", reject);
+    regression.once("exit", (code) =>
+      code === 0
+        ? resolve()
+        : reject(Error("MIDI highlight regression failed")),
+    );
+  });
 } finally {
   server.kill();
 }
