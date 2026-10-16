@@ -15,7 +15,7 @@
 
 ## Run and test
 
-Use Node.js 22 or newer. `npm ci` installs developer-only Playwright. `npm run serve` starts the loopback preview. End users do not need Node.
+Use Node.js 22 or newer and install FFmpeg (`ffprobe` on PATH, or set `FFPROBE`) for independent MP3 format checks. `npm ci` installs developer-only Playwright. `npm run serve` starts the loopback preview. End users do not need Node.
 
 ```sh
 npm ci
