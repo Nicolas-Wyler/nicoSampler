@@ -1,0 +1,7 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import {sample,fitMarkers} from '../src/model.js';import {WasmEngine,interleave} from '../src/wasm-engine.js';
+const module=await WebAssembly.compile(await readFile(new URL('../src/engine.wasm',import.meta.url)));
+function play(pan=0,mono=false,view='mixed'){const e=new WasmEngine(module),s=sample('Stereo');s.audio=[new Float32Array(44100).fill(.1),new Float32Array(44100).fill(.3)];Object.assign(s,{level:1,pan,mono,wave_view:view});fitMarkers(s);e.load(0,interleave(s.audio));e.configure(0,s);e.api.set_master(1);e.api.trigger(0,60,127,0);for(let i=0;i<8;i++)e.output(128);const a=e.output(128);return a.map(c=>c.slice());}
+const mean=a=>a.reduce((n,x)=>n+x,0)/a.length;
+test('DSP pan preserves stereo center and routes documented equal-power extremes',()=>{for(const[pan,left,right]of [[0,.1,.3],[-1,.1*Math.SQRT2,0],[1,0,.3*Math.SQRT2]]){const a=play(pan);assert.ok(Math.abs(mean(a[0])-left)<1e-6,`pan ${pan} left ${mean(a[0])}`);assert.ok(Math.abs(mean(a[1])-right)<1e-6,`pan ${pan} right ${mean(a[1])}`);}});
+test('mono playback mixes channels before centered output, preserving source arrays',()=>{const a=play(0,true);assert.ok(Math.abs(mean(a[0])-.2)<1e-6);assert.deepEqual(a[0],a[1]);});
+test('split waveform presentation has exactly zero effect on rendered stereo or mono samples',()=>{for(const mono of [false,true])assert.deepEqual(play(.37,mono,'mixed'),play(.37,mono,'split'));});

@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {sample,fitMarkers} from '../src/model.js';
+import {sameSampleSnapshot,copySamples} from '../src/sample-clipboard.js';
+const source=sample('Clipboard fixture');source.audio=[Float32Array.of(.1,.2,.3),Float32Array.of(-.1,-.2,-.3)];source.source_wav=new Uint8Array([1,2,3]);source.spread_settings={parameter:'Level',minimum:.2,maximum:.8};fitMarkers(source);
+const snapshot=structuredClone(source);assert(sameSampleSnapshot(source,snapshot));snapshot.audio[0][1]=.7;assert(!sameSampleSnapshot(source,snapshot));snapshot.audio[0][1]=source.audio[0][1];snapshot.pan=.4;assert(!sameSampleSnapshot(source,snapshot));snapshot.pan=source.pan;snapshot.source_wav[1]=7;assert(!sameSampleSnapshot(source,snapshot));snapshot.source_wav[1]=2;snapshot.spread_settings.maximum=.9;assert(!sameSampleSnapshot(source,snapshot));
+assert.equal(await copySamples([],{sourceProgramId:'p'}),null);
+await assert.rejects(()=>copySamples(Array(513).fill(source),{sourceProgramId:'p'}),/512/);
+const invalid={...source,audio:[Float32Array.of(NaN),Float32Array.of(.1)]};await assert.rejects(()=>copySamples([invalid],{sourceProgramId:'p'}),/Non-finite/);
+await assert.rejects(()=>copySamples([source,source],{sourceProgramId:'p'}),/Duplicate/);
+console.log('Sample clipboard: exact PCM/source/settings comparison, empty preservation, row limit, invalid audio and duplicate identities passed.');

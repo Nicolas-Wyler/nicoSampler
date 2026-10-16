@@ -1,0 +1,486 @@
+/* Compact row actions belong to the table and stay aligned while scrolling. */
+.row-delete {
+  width: 42px;
+  min-width: 42px;
+  min-height: 28px;
+  padding: 2px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+}
+.row-delete svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  margin: auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.row-delete:hover {
+  color: #f3b4a8;
+}
+.row-delete.confirm-delete {
+  color: #ffb4aa;
+  border-color: #a94840;
+  background: #542a27;
+  font-size: 10px;
+}
+.pan-knob {
+  min-width: 62px;
+}
+.pan-knob .knob-value {
+  min-width: 31px;
+}
+.program-tab {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: stretch;
+}
+.program-tab > .program {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: 0;
+  padding-right: 5px;
+}
+.program-remove {
+  min-width: 24px;
+  padding: 0 5px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 0;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--muted);
+}
+.program-remove:hover {
+  color: #ffb4aa;
+  background: #542a27;
+}
+#sample-table td:first-child {
+  padding-top: 0;
+  padding-bottom: 0;
+  align-items: stretch;
+}
+#sample-table td:first-child > .activity {
+  align-self: center;
+}
+#sample-table .sample-name {
+  align-self: center;
+}
+#sample-table .row-handle {
+  min-height: 48px;
+  align-self: stretch;
+  width: 24px;
+  min-width: 24px;
+  touch-action: none;
+  user-select: none;
+}
+#sample-table .row-preview {
+  min-width: 32px;
+  width: 32px;
+  min-height: 32px;
+  font-size: 17px;
+  align-self: center;
+}
+#sample-table td.select-cell {
+  padding: 0;
+}
+#sample-table td.select-cell .custom-select {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  height: 100%;
+  width: 100%;
+  border-radius: 0;
+  border: 0;
+  padding: 0 8px;
+}
+.dragging-samples,
+.dragging-samples * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+#sample-table tr.row-dragging td {
+  opacity: 0.55;
+}
+.row-insertion-line {
+  position: fixed;
+  height: 3px;
+  background: var(--accent);
+  pointer-events: none;
+  z-index: 50;
+  transform: translateY(-1px);
+  box-shadow: 0 0 5px #14200f;
+}
+.row-insertion-line::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+#sample-table .knob .knob-value {
+  display: none;
+}
+#sample-table .knob,
+#sample-table .pan-knob {
+  min-width: 32px;
+  width: 32px;
+  justify-content: center;
+  margin: auto;
+}
+/* The add row shares the sample row rhythm and keeps its action at the viewport edge. */
+tfoot .add-sample-row td {
+  display: table-cell;
+  height: 49px;
+  padding: 0;
+  border-top: 0;
+  box-sizing: border-box;
+  overflow: visible;
+  background: #18211b;
+}
+.add-sample-button {
+  position: sticky;
+  left: 0;
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
+  min-height: 48px;
+  aspect-ratio: 1;
+  padding: 0;
+  font-size: 28px;
+  line-height: 1;
+  border-radius: 0;
+  border-color: transparent;
+  background: #18211b;
+  color: var(--accent);
+}
+
+/* Compact columns retain their actual label/control width, plus required chrome. */
+#sample-grid th {
+  padding-right: 9px;
+}
+#sample-table td.select-cell .custom-select {
+  padding: 0 4px;
+  gap: 4px;
+}
+#sample-table .custom-select.two-line-label {
+  white-space: pre;
+  line-height: 1.15;
+}
+
+#sample-table td.key-cell {
+  padding: 0;
+}
+#sample-table .key-assignment {
+  width: 100%;
+  height: 48px;
+  min-height: 48px;
+  border: 0;
+  border-radius: 0;
+  padding: 0 4px;
+  white-space: pre;
+}
+
+/* Tight text columns; fixed square performance controls follow the row height. */
+#sample-grid {
+  --sample-row-size: 49px;
+}
+#sample-grid th {
+  padding: 3px 2px;
+}
+#sample-grid .resize-handle {
+  width: 6px;
+}
+#sample-table td {
+  padding-left: 2px;
+  padding-right: 2px;
+}
+#sample-table td:first-child {
+  gap: 2px;
+}
+#sample-table td.select-cell,
+#sample-table td.key-cell {
+  padding: 0;
+}
+#sample-table td.select-cell .custom-select {
+  padding: 0 2px;
+  gap: 2px;
+}
+#sample-table .key-assignment {
+  padding: 0 2px;
+}
+#sample-table .row-delete {
+  width: auto;
+  min-width: 0;
+  min-height: 48px;
+  padding: 2px;
+}
+#sample-grid th.square-header {
+  text-align: center;
+}
+#sample-table td.square-cell {
+  padding: 0;
+  height: var(--sample-row-size);
+  text-align: center;
+  vertical-align: middle;
+}
+#sample-table .square-cell .knob {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  height: 48px;
+  min-height: 48px;
+  margin: 0;
+  display: grid;
+  place-items: center;
+}
+#sample-table .square-cell .dial {
+  width: 24px;
+  height: 24px;
+}
+#sample-table .square-cell input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+}
+#sample-table .square-cell input[type="checkbox"] {
+  vertical-align: middle;
+}
+#sample-table .square-cell input[type="checkbox"]:checked::after {
+  width: 7px;
+  height: 4px;
+}
+#sample-table .square-cell .dial::after {
+  left: 10px;
+  top: 2px;
+  height: 9px;
+  transform-origin: 1px 9px;
+}
+
+#sample-table td {
+  height: 49px;
+  padding-top: 0;
+  padding-bottom: 0;
+  vertical-align: middle;
+}
+#sample-table.selection-mode tr:not(.selected) td {
+  opacity: 0.4;
+}
+#sample-table.selection-mode
+  tr
+  td
+  > :not(.row-fixed-controls):not(.row-handle):not(.row-preview):not(
+    .activity
+  ):not(.sample-name) {
+  opacity: 0.3;
+}
+#sample-table.selection-mode tr.selected td {
+  background: #34482e;
+}
+#sample-table.selection-mode .sample-name {
+  cursor: pointer;
+}
+#sample-table.selection-mode,
+#sample-table.selection-mode * {
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* Remove inline-control baseline space so the fixed cells are exactly square. */
+#sample-table td.square-cell,
+#sample-table td:last-child {
+  line-height: 0;
+}
+#sample-table .row-delete {
+  line-height: normal;
+  vertical-align: middle;
+}
+
+#sample-table .sample-name {
+  height: 48px;
+  min-height: 48px;
+}
+#sample-table .inline-name {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+}
+
+#sample-table .custom-select::after {
+  display: none;
+}
+#sample-table td.select-cell .custom-select {
+  gap: 0;
+}
+
+.sample-row-actions {
+  position: sticky;
+  left: 0;
+  display: inline-flex;
+  height: 48px;
+  vertical-align: middle;
+  touch-action: manipulation;
+}
+.sample-row-actions .add-sample-button,
+.sample-row-actions .remove-sample-button {
+  position: static;
+  width: 96px;
+  min-width: 96px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0;
+  border-radius: 0;
+  font-size: 28px;
+  line-height: 1;
+  aspect-ratio: 2;
+  background: #18211b;
+  border: 0;
+}
+.sample-row-actions .remove-sample-button {
+  color: var(--accent);
+}
+.sample-row-actions .remove-sample-button:hover {
+  color: var(--danger);
+  background: #35251f;
+}
+
+.sample-row-actions .add-sample-button:hover:not(:disabled) {
+  background: #354632;
+}
+
+.sample-row-actions .remove-sample-button.confirm-delete {
+  color: var(--danger);
+  background: #35251f;
+  font-size: 18px;
+}
+.sample-row-actions .remove-sample-button[hidden] {
+  display: none;
+}
+/* Locked controls retain their geometry while their complete header still fits. */
+#sample-grid th.square-header {
+  padding-left: 2px;
+  padding-right: 2px;
+}
+#sample-table td.select-cell .custom-select {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+#sample-table .key-assignment {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+#sample-grid th:not(.square-header) {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+#sample-table
+  td:not(.square-cell):not(.select-cell):not(.key-cell):not(:first-child) {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+/* Rows always cover the available sample panel, even between resize passes. */
+#sample-grid {
+  min-width: 100%;
+}
+
+.master #master-knob {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  min-width: 34px;
+  min-height: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  touch-action: none;
+  cursor: ns-resize;
+}
+.master #master-knob .dial {
+  width: 24px;
+  height: 24px;
+}
+#sample-table .row-channel-buttons {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 48px;
+  align-self: center;
+}
+#sample-table .row-channel-toggle {
+  display: block;
+  box-sizing: border-box;
+  flex: 0 0 24px;
+  width: 24px;
+  min-width: 24px;
+  max-width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  line-height: 24px;
+  font-size: 11px;
+  text-align: center;
+  color: #a8b5a0;
+  background: #253028;
+}
+#sample-table .row-channel-toggle:hover:not(:disabled) {
+  background: #3c4e38;
+}
+#sample-table .row-mute.active {
+  background: #9d4039;
+  color: #fff0e9;
+}
+#sample-table .row-solo.active {
+  background: #b39842;
+  color: #192019;
+}
+#sample-table .row-channel-toggle:disabled {
+  background: #28302a;
+  color: #6e796b;
+  opacity: 0.4;
+}
+
+/* Offset the control group, not its entire cell, so the name keeps scrolling normally. */
+#sample-table td:first-child {
+  position: relative;
+  z-index: 2;
+  overflow: visible;
+}
+#sample-table .row-fixed-controls {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  flex: 0 0 94px;
+  width: 94px;
+  height: 48px;
+  align-items: center;
+  gap: 2px;
+  transform: translateX(var(--table-scroll-x, 0px));
+  background: #1d261f;
+}
+#sample-table tr.selected .row-fixed-controls {
+  background: #34482e;
+}
+#sample-table.selection-mode .row-fixed-controls > .row-channel-buttons {
+  opacity: 0.3;
+}
+#sample-table td.level-cell {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+}
+#sample-grid th.level-cell {
+  position: sticky;
+  right: 0;
+  z-index: 4;
+}

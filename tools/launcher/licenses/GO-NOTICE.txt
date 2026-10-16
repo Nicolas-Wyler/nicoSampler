@@ -1,0 +1,7 @@
+nicoSampler portable launcher
+
+The native launcher binaries are compiled with Go (see TOOLCHAIN.txt for the exact build version) and include Go runtime and standard-library code. Go is distributed under its BSD-style license; the complete Go LICENSE and PATENTS files accompany this notice. License files for vendored golang.org/x packages are included as conservative standard-library attribution. The Go compiler and build toolchain are not shipped.
+
+Official source and toolchain: https://go.dev/
+Go source distribution: https://go.dev/dl/
+The sampler application's own license is separate and does not replace these third-party licenses.

@@ -1,0 +1,912 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"
+    />
+    <meta name="theme-color" content="#111615" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/icon.svg" />
+    <link rel="stylesheet" href="./style.css" />
+    <link rel="stylesheet" href="./src/rows.css" />
+    <link rel="stylesheet" href="./src/landing.css" />
+    <title>Minimal Sampler · Classic</title>
+  </head>
+  <body>
+    <section id="landing" aria-label="Start a program">
+      <button id="landing-drop" aria-label="Import bank, programs or samples">
+        <strong>Drop files here</strong>
+        <span>Bank · Programs · Sample containers · WAV</span>
+        <span>or click to choose files</span>
+      </button>
+      <button id="landing-new">Empty project</button>
+      <p id="landing-status" role="status" aria-live="polite"></p>
+      <input
+        id="landing-files"
+        type="file"
+        accept=".zip,.nicosbank,.nicoprog,.nicosample,.wav,.json"
+        multiple
+        hidden
+      />
+    </section>
+    <main hidden id="sampler" aria-label="Minimal Sampler Classic">
+      <header class="program-header">
+        <span class="brand-icon" title="Minimal Sampler Classic">n.</span>
+        <nav id="program-ribbon" aria-label="Programs"></nav>
+        <div class="output">
+          <div class="meter-stack">
+            <div class="meter-row">
+              <span class="meter-label">In:</span>
+              <div id="input-monitor-control" class="input-monitor-control">
+                <div
+                  class="meter"
+                  role="meter"
+                  aria-label="Input level"
+                  aria-valuemin="-60"
+                  aria-valuemax="0"
+                  aria-valuenow="-60"
+                >
+                  <i id="header-input-meter"></i>
+                </div>
+                <button
+                  id="input-monitor"
+                  type="button"
+                  aria-label="Activate input monitor"
+                  aria-pressed="false"
+                >
+                  <span class="input-monitor-label">Click to activate</span>
+                </button>
+              </div>
+            </div>
+            <div class="meter-row">
+              <span class="meter-label">Out:</span>
+              <div
+                class="meter"
+                role="meter"
+                aria-label="Output level"
+                aria-valuemin="-60"
+                aria-valuemax="0"
+                aria-valuenow="-60"
+              >
+                <i id="output-meter"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+      <section class="storagebar" aria-label="Program and bank files">
+        <select id="save-kind" aria-label="Save">
+          <option value="" hidden>Save</option>
+          <option value="bank">Bank</option>
+          <option value="program">Program</option>
+          <option value="sample">Sample</option>
+          <option value="render">Resample</option>
+        </select>
+        <select id="load-kind" aria-label="Load">
+          <option value="" hidden>Load</option>
+          <option value="bank">Bank</option>
+          <option value="program">Program</option>
+          <option value="sample">Sample</option>
+          <option value="example">Example kit</option>
+        </select>
+        <div class="inputs midi-routing">
+          <label id="input-routing-label" hidden>
+            <select
+              id="input-source"
+              aria-label="Input"
+              data-display-prefix="Input: "
+            >
+              <option>PC Keyboard</option>
+              <option>None</option>
+            </select></label
+          ><button id="connect-midi">Connect MIDI</button
+          ><label id="midi-channel-label" hidden>
+            <select
+              id="midi-channel"
+              aria-label="MIDI Ch"
+              data-display-prefix="Ch: "
+            >
+              <option>All</option>
+              <option>None</option>
+            </select></label
+          ><span id="midi-status" class="subtle"></span>
+        </div>
+        <span class="spacer"></span>
+        <div class="master">
+          <span>Master</span>
+          <button
+            id="master-knob"
+            class="knob"
+            type="button"
+            role="slider"
+            aria-label="Master volume"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="100"
+          >
+            <span class="dial" aria-hidden="true"></span>
+          </button>
+          <input
+            id="master"
+            type="range"
+            min="0"
+            max="100"
+            value="100"
+            hidden
+          />
+          <output id="master-value">100%</output>
+        </div>
+        <button id="install" hidden>Install app</button>
+        <div class="audio-tools">
+          <button
+            id="enable-audio"
+            title="Enable or resume browser audio. Playing a note can enable it too."
+          >
+            Enable audio</button
+          ><button id="panic">Panic</button>
+        </div>
+      </section>
+
+      <section class="samples-panel" aria-label="Samples">
+        <div class="panel-heading">
+          <h1>Samples <span id="sample-count">0</span></h1>
+          <span id="memory-info" class="subtle"></span>
+        </div>
+        <div class="toolbar">
+          <button id="duplicate-sample">Duplicate</button
+          ><button id="fx-open">FX</button
+          ><button id="spread-open">Spread</button
+          ><button id="record-open">Record</button
+          ><button id="trim-open">Trim</button>
+        </div>
+        <div id="table-wrap">
+          <table id="sample-grid">
+            <colgroup id="table-cols"></colgroup>
+            <thead>
+              <tr id="table-head"></tr>
+            </thead>
+            <tbody id="sample-table"></tbody>
+          </table>
+        </div>
+      </section>
+      <div class="statusline">
+        <span id="status" role="status" aria-live="polite"
+          >Load a sample, then assign its MIDI key. Default playback:
+          mono.</span
+        ><span id="engine-status">Audio stopped</span
+        ><span id="base-latency">Base latency: unavailable</span
+        ><span id="save-status">Local autosave</span>
+      </div>
+      <section
+        class="keyboard-panel"
+        aria-label="Onscreen keyboard always available"
+      >
+        <div id="keyboard-scroll">
+          <div id="keyboard" role="group" aria-label="Full MIDI piano"></div>
+        </div>
+        <div class="octavebar">
+          <button id="close-app">Close</button>
+          <span id="octave-label"></span>
+          <button id="octave-down">← Octave</button>
+          <button id="octave-up">Octave →</button>
+          <button id="keyboard-zoom-out" aria-label="Zoom keyboard out">
+            −
+          </button>
+          <button id="keyboard-zoom-in" aria-label="Zoom keyboard in">+</button>
+        </div>
+      </section>
+    </main>
+    <dialog id="resample-dialog" class="editor">
+      <header class="dialog-header">
+        <h2>Resample selected samples</h2>
+        <button data-close="resample-dialog" aria-label="Close Resample">
+          ✕
+        </button>
+      </header>
+      <p id="render-selection"></p>
+      <p id="render-mixed" class="hint" hidden></p>
+      <div class="fields two">
+        <label id="render-policy-label" class="field"
+          >Output settings<select id="render-policy">
+            <option value="source">Match each source format</option>
+            <option value="common">Use one common format</option>
+          </select></label
+        >
+        <label class="field"
+          >Sample rate<select id="render-rate">
+            <option value="22050">22.05 kHz</option>
+            <option value="32000">32 kHz</option>
+            <option value="44100" selected>44.1 kHz</option>
+            <option value="48000">48 kHz</option>
+            <option value="96000">96 kHz</option>
+          </select></label
+        >
+        <label class="field"
+          >Format<select id="render-format">
+            <option value="wav">WAV</option>
+            <option value="mp3">MP3</option>
+          </select></label
+        >
+        <label id="render-bits-label" class="field"
+          >Bit depth<select id="render-bits">
+            <option value="8">8-bit PCM</option>
+            <option value="12">12-bit PCM</option>
+            <option value="16">16-bit PCM</option>
+            <option value="24">24-bit PCM</option>
+            <option value="32" selected>32-bit float</option>
+          </select></label
+        >
+        <label id="render-bitrate-label" class="field" hidden
+          >Bitrate<select id="render-bitrate">
+            <option value="128">128 kbps</option>
+            <option value="192" selected>192 kbps</option>
+            <option value="256">256 kbps</option>
+            <option value="320">320 kbps</option>
+          </select></label
+        >
+        <label class="field"
+          >Channels<select id="render-channels">
+            <option value="2">Stereo</option>
+            <option value="1">Mono</option>
+          </select></label
+        >
+      </div>
+      <p class="hint">
+        The bitcrusher changes the sound; it is not the sample’s storage format.
+        Playback caches use 32-bit float. Defaults follow the original WAV or
+        recording format; unknown sources use 44.1 kHz / 32-bit float. Rendering
+        runs the DSP once before output conversion.
+      </p>
+      <p class="hint">
+        Renders the stored root/assigned note at full velocity, including sound
+        processing, pan, shared FX and master. Loops play one pass and release;
+        effect tails are limited to 10 seconds. Enter exports.
+      </p>
+      <button id="render-export" class="primary">Export rendered audio</button>
+    </dialog>
+    <dialog id="row-value-dialog" class="editor">
+      <header class="dialog-header">
+        <h2 id="row-value-title">Level</h2>
+        <button data-close="row-value-dialog" aria-label="Close value editor">
+          ✕
+        </button>
+      </header>
+      <div class="fields two">
+        <label id="row-value-unit-wrap" class="field rotary-field"
+          >Value<input
+            id="row-value-unit"
+            data-rotary="Value"
+            data-unit="%"
+            data-decimals="1"
+            type="range"
+            min="0"
+            max="100"
+            step="0.1"
+        /></label>
+        <label id="row-value-pan-wrap" class="field rotary-field" hidden
+          >Pan<input
+            id="row-value-pan"
+            data-rotary="Pan"
+            data-unit="%"
+            data-decimals="1"
+            type="range"
+            min="-100"
+            max="100"
+            step="0.1"
+        /></label>
+        <label class="field"
+          >Value (%)<input
+            id="row-value-number"
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+        /></label>
+      </div>
+    </dialog>
+    <dialog id="envelope-dialog" class="editor">
+      <header class="dialog-header">
+        <h2>Envelope</h2>
+        <button data-close="envelope-dialog" aria-label="Close Envelope">
+          ✕
+        </button>
+      </header>
+      <canvas
+        id="envelope-canvas"
+        class="response-diagram"
+        width="640"
+        height="180"
+      ></canvas>
+      <div class="fields two">
+        <label class="field"
+          >ATTACK · MS
+          <input id="attack" type="number" min="0" step="1" /></label
+        ><label class="field"
+          >DECAY · MS <input id="decay" type="number" min="0" step="1"
+        /></label>
+      </div>
+      <p class="hint">
+        Changes apply to the selected row. This editor follows sample selection.
+      </p>
+    </dialog>
+    <dialog id="pitch-dialog" class="editor">
+      <header class="dialog-header">
+        <h2>Pitch</h2>
+        <button data-close="pitch-dialog" aria-label="Close Pitch">✕</button>
+      </header>
+      <div class="pitch-controls">
+        <div class="pitch-control">
+          <label class="field rotary-field"
+            >Semitones<input
+              id="semitone-knob"
+              data-rotary="Semitone knob"
+              data-decimals="0"
+              data-unit=" st"
+              type="range"
+              min="-48"
+              max="48"
+              step="1"
+              value="0"
+          /></label>
+          <label class="field"
+            >SEMITONES<input
+              id="semitone"
+              type="number"
+              min="-48"
+              max="48"
+              step="1"
+          /></label>
+        </div>
+        <div class="pitch-control">
+          <label class="field rotary-field"
+            >Fine<input
+              id="fine-knob"
+              data-rotary="Fine knob"
+              data-decimals="0"
+              data-unit=" ct"
+              type="range"
+              min="-100"
+              max="100"
+              step="1"
+              value="0"
+          /></label>
+          <label class="field"
+            >CENTS<input id="fine" type="number" min="-100" max="100" step="1"
+          /></label>
+        </div>
+      </div>
+      <div class="pitch-octaves">
+        <button id="pitch-octave-down">− Octave</button
+        ><button id="pitch-octave-up">+ Octave</button>
+      </div>
+      <p class="hint">
+        Drag the row pitch vertically for coarse changes; click to enter exact
+        values.
+      </p>
+    </dialog>
+    <dialog id="filter-dialog" class="editor">
+      <header class="dialog-header">
+        <h2>Filter</h2>
+        <button data-close="filter-dialog" aria-label="Close Filter">✕</button>
+      </header>
+      <canvas
+        id="filter-canvas"
+        class="response-diagram"
+        width="640"
+        height="180"
+      ></canvas>
+      <div class="fields two">
+        <label class="field"
+          >FILTER
+          <select id="filter-mode">
+            <option>LPF</option>
+            <option>HPF</option>
+          </select></label
+        ><label class="check align-end"
+          ><input id="filter-enabled" type="checkbox" />Enabled</label
+        >
+      </div>
+      <div class="filter-knobs">
+        <label class="field rotary-field"
+          >Cutoff<input
+            id="cutoff"
+            data-rotary="Cutoff"
+            type="range"
+            min="0"
+            max="1000"
+            step="1" /><output id="cutoff-value" hidden></output
+        ></label>
+        <label class="field rotary-field"
+          >Resonance<input
+            id="resonance"
+            data-rotary="Resonance"
+            type="range"
+            min="0"
+            max="10"
+            step="0.1" /><output id="resonance-value" hidden></output
+        ></label>
+      </div>
+      <p class="hint">
+        Drag the point: left/right changes cutoff, up/down changes resonance.
+        LPF bypasses at the right edge; HPF bypasses at the left edge.
+      </p>
+    </dialog>
+    <dialog id="fx-dialog" class="editor">
+      <header class="dialog-header">
+        <h2>FX</h2>
+        <button data-close="fx-dialog" aria-label="Close FX">✕</button>
+      </header>
+      <div class="fx-tabs">
+        <button data-fx="0" class="active">FX1</button
+        ><button data-fx="1">FX2</button>
+      </div>
+      <section class="fx-panel panel" aria-label="Shared tape delays">
+        <div class="panel-heading">
+          <div>
+            <span class="eyebrow">SHARED EFFECTS</span>
+            <h2>Tape delays</h2>
+          </div>
+          <span class="chip">C++ / WASM</span>
+        </div>
+        <div class="delay">
+          <label class="field"
+            >Effect<select id="fx1-type" aria-label="FX1 effect type">
+              <option>Analog delay</option>
+            </select></label
+          >
+          <label class="field rotary-field"
+            >Time<input
+              id="delay1-time"
+              data-rotary="Time"
+              type="range"
+              min="0.001"
+              max="1.5"
+              step="0.001"
+              value="0.3"
+          /></label>
+          <label class="field rotary-field"
+            >Feedback<input
+              id="delay1-feedback"
+              data-rotary="Feedback"
+              type="range"
+              min="0"
+              max="2"
+              step="0.01"
+              value="0.35"
+            /><output id="delay1-value" hidden>0.35</output></label
+          >
+        </div>
+        <div class="delay">
+          <label class="field"
+            >Effect<select id="fx2-type" aria-label="FX2 effect type">
+              <option>Analog delay</option>
+            </select></label
+          >
+          <label class="field rotary-field"
+            >Time<input
+              id="delay2-time"
+              data-rotary="Time"
+              type="range"
+              min="0.001"
+              max="1.5"
+              step="0.001"
+              value="0.45"
+          /></label>
+          <label class="field rotary-field"
+            >Feedback<input
+              id="delay2-feedback"
+              data-rotary="Feedback"
+              type="range"
+              min="0"
+              max="2"
+              step="0.01"
+              value="0.25"
+            /><output id="delay2-value" hidden>0.25</output></label
+          >
+        </div>
+        <p class="hint">
+          Moving-head pitch changes. Feedback above 1 self-oscillates. Stop all
+          clears echoes.
+        </p>
+      </section>
+    </dialog>
+    <dialog id="trim-dialog" class="editor">
+      <header class="dialog-header">
+        <h2>Trim</h2>
+        <button data-close="trim-dialog" aria-label="Close Trim">✕</button>
+      </header>
+      <section class="wave-panel panel" aria-labelledby="wave-title">
+        <div class="panel-heading">
+          <div>
+            <span class="eyebrow">NON-DESTRUCTIVE EDITOR</span>
+            <h2 id="wave-title">Waveform</h2>
+          </div>
+          <div class="wave-tools">
+            <button id="trim-play">Play</button
+            ><button id="trim-stop">Stop</button>
+            <button id="undo" aria-label="Undo sample edit">↶</button
+            ><button id="redo" aria-label="Redo sample edit">↷</button
+            ><button id="zoom-in" aria-label="Zoom in waveform">＋</button
+            ><button id="zoom-out" aria-label="Zoom out waveform">−</button
+            ><button id="zoom-fit">Full</button
+            ><button id="trim-export">Save WAV + settings</button>
+          </div>
+        </div>
+        <div class="canvas-wrap">
+          <canvas
+            id="waveform"
+            aria-label="Waveform: drag trim and loop handles. Numeric controls are available below."
+          ></canvas
+          ><span id="wave-empty">Load a sample to see its waveform.</span>
+        </div>
+        <input
+          id="wave-pan"
+          aria-label="Pan waveform"
+          type="range"
+          min="0"
+          max="1000"
+          value="0"
+        />
+        <div class="wave-settings">
+          <label class="field"
+            >TRIM START · S
+            <input id="trim-start" type="number" min="0" step="0.001" /></label
+          ><label class="field"
+            >TRIM END · S
+            <input id="trim-end" type="number" min="0" step="0.001" /></label
+          ><label class="field"
+            >LOOP START · S
+            <input id="loop-start" type="number" min="0" step="0.001" /></label
+          ><label class="field"
+            >LOOP END · S
+            <input id="loop-end" type="number" min="0" step="0.001" /></label
+          ><label class="field"
+            >RATE · HZ
+            <input
+              id="crush-rate"
+              type="number"
+              min="100"
+              max="44100"
+              step="100" /></label
+          ><label class="field"
+            >BITS <input id="crush-bits" type="number" min="1" max="32"
+          /></label>
+        </div>
+        <div class="wave-footer">
+          <label class="check"
+            ><input id="reverse" type="checkbox" />Reverse</label
+          ><label class="check"
+            ><input id="normalize" type="checkbox" />Normalize</label
+          ><button id="native-reset">Native reset</button>
+          <div class="spacer"></div>
+          <label
+            >Waveform
+            <select id="wave-channels" aria-label="Waveform channels">
+              <option value="mono">Mono</option>
+              <option value="stereo">Stereo</option>
+              <option value="show-stereo">Show stereo</option>
+            </select></label
+          >
+          <span id="wave-info" class="subtle">44.1 kHz source · stereo</span>
+        </div>
+      </section>
+    </dialog>
+    <dialog id="spread-dialog" class="editor">
+      <header class="dialog-header">
+        <h2>Spread sample</h2>
+        <button data-close="spread-dialog" aria-label="Close Spread sample">
+          ✕
+        </button>
+      </header>
+      <p id="spread-sample-name"></p>
+      <div id="spread-options">
+        <label class="field"
+          >Spread parameter<select id="spread-kind">
+            <option>Pitch</option>
+            <option>Level</option>
+            <option>LPF Cutoff</option>
+            <option>HPF Cutoff</option>
+            <option>Attack</option>
+            <option>Decay</option>
+          </select></label
+        >
+        <div id="spread-value-fields" class="fields two">
+          <label class="field" id="spread-min-label"
+            >Minimum<input
+              id="spread-minimum"
+              type="number"
+              step="any" /></label
+          ><label class="field" id="spread-max-label"
+            >Maximum<input id="spread-maximum" type="number" step="any"
+          /></label>
+        </div>
+        <div id="spread-filter-fields">
+          <div class="fields two">
+            <label class="field"
+              >Minimum resonance<input
+                id="spread-rmin"
+                type="number"
+                min="0"
+                max="10"
+                step=".001" /></label
+            ><label class="field"
+              >Resonance / maximum<input
+                id="spread-rmax"
+                type="number"
+                min="0"
+                max="10"
+                step=".001"
+            /></label>
+          </div>
+          <label class="check"
+            ><input id="spread-couple" type="checkbox" />Couple resonance to
+            cutoff</label
+          >
+        </div>
+        <p id="spread-instructions"></p>
+        <button id="spread-ok" class="primary">OK</button>
+      </div>
+      <p id="spread-prompt" role="status" hidden></p>
+      <p id="spread-summary"></p>
+      <div class="dialog-actions">
+        <button id="spread-remove">Remove Spread</button
+        ><button id="spread-cancel">Cancel</button>
+      </div>
+    </dialog>
+    <dialog id="batch-dialog" class="editor">
+      <header class="dialog-header">
+        <h2>Assign loaded samples</h2>
+        <button
+          data-close="batch-dialog"
+          aria-label="Close Assign loaded samples"
+        >
+          ✕
+        </button>
+      </header>
+      <p id="batch-prompt" role="status"></p>
+      <button id="batch-cancel">Cancel</button>
+    </dialog>
+    <dialog id="collision-dialog" class="editor">
+      <header class="dialog-header">
+        <h2>Assigned keys</h2>
+        <button data-close="collision-dialog" aria-label="Close Assigned keys">
+          ✕
+        </button>
+      </header>
+      <p id="collision-message"></p>
+      <p class="hint">
+        Override clears all assignments of overlapping rows. Multi-assign plays
+        both samples.
+      </p>
+      <div class="dialog-actions">
+        <button data-collision="Cancel">Cancel</button
+        ><button data-collision="Override">Override</button
+        ><button data-collision="Multi-assign">Multi-assign</button>
+      </div>
+    </dialog>
+    <dialog id="replace-dialog" class="editor">
+      <header class="dialog-header">
+        <h2>Replace this sample?</h2>
+        <button
+          data-close="replace-dialog"
+          aria-label="Close Replace this sample?"
+        >
+          ✕
+        </button>
+      </header>
+      <p id="replace-message"></p>
+      <div class="dialog-actions">
+        <button data-replacement="Cancel">Cancel</button
+        ><button data-replacement="Overwrite">Overwrite</button
+        ><button data-replacement="Make New Row">Make New Row</button>
+      </div>
+    </dialog>
+    <dialog id="record-dialog" class="editor">
+      <div class="dialog-header">
+        <h2>Record a sound</h2>
+        <button id="record-close" aria-label="Close recorder">✕</button>
+      </div>
+      <p class="hint">
+        Input is not sent to speakers. Up to 3 minutes per take.
+      </p>
+      <div class="fields two record-input-row">
+        <label class="field"
+          ><select
+            id="record-source"
+            aria-label="Source"
+            data-display-prefix="Source: "
+          >
+            <option value="mic">Microphone / audio interface</option>
+            <option value="system">
+              Shared tab / system audio (when supported)
+            </option>
+          </select></label
+        ><label class="field"
+          ><select
+            id="record-device"
+            aria-label="Device"
+            data-display-prefix="Device: "
+          >
+            <option value="">System default</option>
+          </select></label
+        >
+      </div>
+      <div class="fields record-format-row">
+        <label class="field"
+          ><select
+            id="record-mode"
+            aria-label="Channels"
+            data-display-prefix="Channels: "
+          >
+            <option>Stereo</option>
+            <option>Mono L</option>
+            <option>Mono R</option>
+            <option>Mono mix</option>
+          </select></label
+        >
+        <label class="field"
+          ><select
+            id="record-rate"
+            aria-label="Sample rate"
+            data-display-prefix="Sample rate: "
+          >
+            <option value="8000">8 kHz</option>
+            <option value="11025">11.025 kHz</option>
+            <option value="22050">22.05 kHz</option>
+            <option value="32000">32 kHz</option>
+            <option value="44100" selected>44.1 kHz</option>
+            <option value="48000">48 kHz</option>
+            <option value="96000">96 kHz</option>
+          </select></label
+        ><label class="field"
+          ><select
+            id="record-bits"
+            aria-label="Bit depth"
+            data-display-prefix="Bit depth: "
+          >
+            <option value="8">8-bit PCM</option>
+            <option value="12">12-bit PCM</option>
+            <option value="16" selected>16-bit PCM</option>
+            <option value="24">24-bit PCM</option>
+            <option value="32">32-bit float</option>
+          </select></label
+        >
+      </div>
+      <p class="hint">
+        Drag the meter marker to set the recording trigger threshold.
+      </p>
+      <div class="record-meter"><i id="input-meter"></i></div>
+      <p id="record-status" role="status">
+        Input connects automatically. Record or Arm retries if needed.
+      </p>
+      <div class="dialog-actions record-transport">
+        <button id="record-start" class="record-button" disabled="">
+          Record</button
+        ><button id="record-arm" disabled="">Arm</button
+        ><button id="record-stop" hidden disabled="">Stop</button>
+      </div>
+      <label class="field take-library"
+        >RECORDED TAKES
+        <select id="take-select">
+          <option value="">No recorded takes</option>
+        </select></label
+      >
+      <div id="take-actions" hidden="">
+        <p id="take-info"></p>
+        <div class="dialog-actions">
+          <button id="take-preview">▶ Preview</button
+          ><button id="take-use" class="primary">Use Recording</button
+          ><button id="take-replace">Replace selected</button
+          ><button id="take-export">Export WAV</button>
+        </div>
+        <button id="take-stop">Stop Playback</button
+        ><button id="record-retry">Retry</button
+        ><button id="take-discard">Discard take</button>
+      </div>
+    </dialog>
+    <dialog id="help-dialog" class="editor">
+      <header class="dialog-header">
+        <h2>Minimal Sampler · Classic</h2>
+        <button id="help-close" aria-label="Close help">✕</button>
+      </header>
+      <p>
+        The Python sampler layout, with a C++/WebAssembly audio engine. Your
+        audio stays on this device.
+      </p>
+      <h3>Rows and inputs</h3>
+      <p>
+        New adds an unassigned row. Sample replaces the selected row’s audio;
+        multiple files are sorted and assigned consecutively after you play one
+        starting key. Row controls edit envelope, Trigger, Overlap, MIDI
+        assignment, Level, Max Vel, Pitch, Filter, FX1 and FX2. Click a name to
+        rename. Cmd/Ctrl-click and Shift-click select multiple rows to move or
+        remove together. Each row has a play/stop preview button. Drag dividers
+        to widen columns.
+      </p>
+      <p>
+        The onscreen piano and touch always play regardless of Input or MIDI
+        channel. Computer keys always play except during text or number entry.
+        Connected MIDI inputs also remain active. Z plays G-sharp; octave
+        changes use the arrow buttons.
+      </p>
+      <h3>Spread</h3>
+      <p>
+        Choose a parameter. Pitch learns root → lower → upper. Other parameters
+        learn lower → upper. On a collision, Cancel keeps existing settings,
+        Override clears overlapping assignments, and Multi-assign layers sounds.
+      </p>
+      <h3>Python shortcuts</h3>
+      <p>
+        A W S E D F T G Z H U J K O L: musical keys. Up/Down: row selection
+        outside fields. Trim: hold Space to loop, release to play the tail;
+        Cmd/Ctrl Z undo, Shift for redo. Record: Space starts/stops, Shift+Space
+        arms/disarms, F8 previews, F9 starts, F10 stops. Escape closes the
+        current editor or cancels learning. Typing into fields does not play
+        notes. Added convenience: Cmd/Ctrl S saves a bank.
+      </p>
+      <h3>Editors and files</h3>
+      <p>
+        Editors are movable windows inside this page and follow selected rows.
+        Trim edits remain reversible. Save exports the processed trimmed region;
+        pitch, envelope, filter and FX are playback settings. Save Bank/Program
+        packages original audio and settings in portable v3 files. Python v1/v2
+        programs and v2 banks can be imported by selecting their referenced
+        audio when requested. The Python application cannot read v3 exports.
+      </p>
+      <h3>Recovery and offline</h3>
+      <p>
+        Autosave and recorded takes use this version’s separate browser
+        database. Clearing browser storage or private-mode cleanup can erase
+        them; download banks and recordings for backups. After the first full
+        online visit the app works offline. Installation as a PWA is optional.
+      </p>
+      <h3>Platform boundaries</h3>
+      <p>
+        Use desktop Chrome/Edge for native MIDI, with browser permission.
+        Safari/WebKit can play and edit but has no native MIDI. Recording needs
+        microphone permission; system capture depends on browser/OS. Desktop
+        behavior is the priority; phone layout has not been optimized in this
+        edition.
+      </p>
+      <p>
+        <a href="./README.md" target="_blank" rel="noopener"
+          >Read parity notes and verification</a
+        >
+      </p>
+      <button id="persistent-storage">Request persistent local storage</button
+      ><button id="reset-session" class="danger">Clear local session…</button>
+    </dialog>
+    <dialog id="relink-dialog" class="editor">
+      <h2>Locate original audio</h2>
+      <p>
+        This project uses relative audio paths. Choose its unpacked root folder
+        to allow the browser to resolve them. Legacy projects can also locate
+        individual audio files.
+      </p>
+      <div id="missing-files" class="missing-list"></div>
+      <div class="dialog-actions">
+        <button id="relink-folder" class="primary">Choose project folder</button
+        ><button id="relink-pick">Choose audio files</button
+        ><button id="relink-empty">Keep missing rows</button
+        ><button id="relink-cancel">Cancel import</button>
+      </div>
+    </dialog>
+    <input
+      id="audio-files"
+      type="file"
+      accept="audio/*,.wav,.aif,.aiff,.flac,.mp3,.m4a,.ogg,.aac,.wma,.opus,.nicosample"
+      multiple
+      hidden
+    /><input
+      id="bank-files"
+      type="file"
+      accept=".zip,.nicosbank,.nicoprog,.nicosample,.json"
+      hidden
+    /><input id="relink-files" type="file" accept="audio/*" multiple hidden />
+    <input id="project-folder" type="file" webkitdirectory multiple hidden />
+    <div id="toast" role="alert" hidden></div>
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>

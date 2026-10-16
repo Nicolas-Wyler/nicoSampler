@@ -1,0 +1,33 @@
+name: Build release downloads
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.27.2'
+          cache: false
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:integration
+      - run: sh scripts/build-launchers.sh
+      - run: npm run build:release
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nicoSampler-release-downloads
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS.txt
+            dist/release-manifest.json
