@@ -307,7 +307,17 @@ export class Waveform {
       span = this.viewEnd - this.viewStart,
       audio = this.processed ?? s.audio;
     const split = s.wave_view === "split";
-    const lanes = split ? [0, 1] : [s.mono ? 2 : -1];
+    const lanes = split
+      ? [0, 1]
+      : [
+          s.mono
+            ? s.mono_channel === "left"
+              ? 0
+              : s.mono_channel === "right"
+                ? 1
+                : 2
+            : -1,
+        ];
     for (let lane = 0; lane < lanes.length; lane++) {
       const channel = lanes[lane],
         data = channel === -1 ? this.peaks : this.channelPeaks[channel];

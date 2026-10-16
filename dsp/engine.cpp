@@ -24,6 +24,7 @@ struct Sample {
   float level = 1, semitone = 0, fine = 0, attack = 0, decay = 0, cutoff = 0,
         resonance = 0, fx1 = 0, fx2 = 0, pan = 0, panLeft = 1, panRight = 1;
   bool mono = false, muted = false;
+  int monoChannel = 0;
   int filter = 0, maxVelocity = 0, spread = 0, coupled = 0;
   float minimum = 0, maximum = 0, resMin = 0, resMax = 0;
 };
@@ -243,6 +244,7 @@ API void configure(int id, int ptr) {
   s.coupled = int(p[29]);
   s.pan = clamp(p[30], -1.f, 1.f);
   s.mono = (int(p[31]) & 1) != 0;
+  s.monoChannel = (int(p[31]) & 4) ? 1 : (int(p[31]) & 8) ? 2 : 0;
   s.muted = (int(p[31]) & 2) != 0;
   s.panLeft = s.pan == 0 ? 1.f : 1.41421356237f * cosf((s.pan + 1) * .785398163397f);
   s.panRight = s.pan == 0 ? 1.f : 1.41421356237f * sinf((s.pan + 1) * .785398163397f);
@@ -455,7 +457,10 @@ API void render(int frames) {
         float x =
             (s.data[left * 2 + c] * (1 - f) + s.data[right * 2 + c] * f) * gain;
         if (s.mono) {
-          x = (s.data[left * 2] * (1 - f) + s.data[right * 2] * f +
+          if (s.monoChannel) {
+            int channel = s.monoChannel - 1;
+            x = (s.data[left * 2 + channel] * (1 - f) + s.data[right * 2 + channel] * f) * gain;
+          } else x = (s.data[left * 2] * (1 - f) + s.data[right * 2] * f +
                s.data[left * 2 + 1] * (1 - f) + s.data[right * 2 + 1] * f) * .5f * gain;
         }
         float y = v.b0 * x + v.z1[c];

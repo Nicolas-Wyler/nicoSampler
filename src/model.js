@@ -1,3 +1,4 @@
+import { processingSampleFormat } from "./render-options.js";
 import { generateExampleKit } from "./example-kit.js";
 import { applyPreferences } from "./settings.js";
 export const RATE = 44100;
@@ -55,6 +56,7 @@ export function sample(name = "New sample", key = 60) {
     max_velocity: false,
     pan: 0,
     mono: false,
+    mono_channel: "mix",
     wave_view: "mixed",
     source_wav: null,
     recording_format: null,
@@ -194,6 +196,9 @@ export function validateSample(raw) {
   s.file_name = String(s.file_name ?? "").slice(0, 300);
   for (const k of ["level", "fx1", "fx2"]) number(s[k], 0, 1, k);
   number(s.pan, -1, 1, "pan");
+  s.mono_channel ??= "mix";
+  if (!["mix", "left", "right"].includes(s.mono_channel))
+    throw Error("Invalid mono channel");
   if (typeof s.mono !== "boolean" || !["mixed", "split"].includes(s.wave_view))
     throw Error("Invalid channel mode/view");
   number(s.semitone, -48, 48, "pitch", true);
@@ -331,9 +336,10 @@ export function processAudio(s) {
   const len = s.audio[0].length,
     [start, end] = bounds(s),
     out = [new Float32Array(len), new Float32Array(len)],
-    rate = s.crush_rate ?? RATE;
+    format = processingSampleFormat(s),
+    rate = format.rate;
   let peak = 0;
-  const scale = 2 ** (s.crush_bits - 1);
+  const scale = 2 ** (format.bits - 1);
   for (let i = 0; i < len; i++) {
     const frame = s.reverse ? len - 1 - i : i,
       held =
@@ -342,7 +348,7 @@ export function processAudio(s) {
           : frame;
     for (let c = 0; c < 2; c++) {
       let v = s.audio[c]?.[held] ?? s.audio[0][held];
-      if (s.crush_bits < 32)
+      if (format.bits < 32)
         v = clamp(roundEven(v * scale), -scale, scale - 1) / scale;
       out[c][i] = v;
       if (i >= start && i < end) peak = Math.max(peak, Math.abs(v));

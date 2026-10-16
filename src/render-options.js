@@ -51,3 +51,22 @@ export function renderSelectionDefaults(samples) {
     common: mixed ? fallback() : (formats[0] ?? fallback()),
   };
 }
+
+// The cache cannot regain precision absent from the source. A matching source
+// format is already applied; do not quantize/resample it a second time.
+export function effectiveSampleFormat(sample) {
+  const source = sourceRenderFormat(sample);
+  return {
+    rate: Math.min(sample.crush_rate ?? 44100, source.rate),
+    bits: Math.min(sample.crush_bits ?? 32, source.bits),
+    channels: source.channels,
+  };
+}
+export function processingSampleFormat(sample) {
+  const source = sourceRenderFormat(sample);
+  return {
+    rate:
+      (sample.crush_rate ?? 44100) < source.rate ? sample.crush_rate : 44100,
+    bits: (sample.crush_bits ?? 32) < source.bits ? sample.crush_bits : 32,
+  };
+}

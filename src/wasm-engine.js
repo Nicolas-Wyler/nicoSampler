@@ -1,3 +1,4 @@
+import { processingSampleFormat } from "./render-options.js";
 import { MODES, SPREADS, bounds } from "./model.js";
 export async function compileEngine() {
   const r = await fetch(new URL("./engine.wasm", import.meta.url));
@@ -63,8 +64,8 @@ export class WasmEngine {
       s.loop_start ?? start,
       s.loop_end ?? end,
       s.reverse ? 1 : 0,
-      s.crush_rate,
-      s.crush_bits,
+      processingSampleFormat(s).rate,
+      processingSampleFormat(s).bits,
       s.normalization ? 1 : 0,
       q ? SPREADS.indexOf(q.parameter) + 1 : 0,
       q?.minimum ?? 0,
@@ -73,7 +74,9 @@ export class WasmEngine {
       q?.resonance_max ?? 0,
       q?.coupled ? 1 : 0,
       s.pan ?? 0,
-      (s.mono ? 1 : 0) | (s.mute || s.effective_mute ? 2 : 0),
+      (s.mono ? 1 : 0) |
+        (s.mute || s.effective_mute ? 2 : 0) |
+        (s.mono_channel === "left" ? 4 : s.mono_channel === "right" ? 8 : 0),
     ];
     new Float32Array(this.api.memory.buffer, this.configPtr, 32).set(data);
     this.api.configure(id, this.configPtr);

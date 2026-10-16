@@ -12,7 +12,11 @@ import {
   isLegacyEmptyProgram,
 } from "./landing-import.js";
 import { encodePcmWav } from "./wav-format.js";
-import { renderSelectionDefaults } from "./render-options.js";
+import {
+  renderSelectionDefaults,
+  sourceRenderFormat,
+  effectiveSampleFormat,
+} from "./render-options.js";
 import { rawWave } from "./sample-container.js";
 import {
   initFilterUI,
@@ -541,8 +545,8 @@ function inspector() {
     decay: s.decay_ms,
     "filter-mode": s.filter_mode,
     resonance: s.lpf_resonance,
-    "crush-rate": s.crush_rate,
-    "crush-bits": s.crush_bits,
+    "crush-rate": effectiveSampleFormat(s).rate / 1000,
+    "crush-bits": effectiveSampleFormat(s).bits,
   }))
     setValue(id, v);
   $("reverse").checked = s.reverse;
@@ -580,7 +584,15 @@ function inspector() {
     $(id).disabled = !s.audio;
   wave.setSample(s, audio.processed(s));
   $("wave-channels").value =
-    s.wave_view === "split" ? "show-stereo" : s.mono ? "mono" : "stereo";
+    s.wave_view === "split"
+      ? "show-stereo"
+      : s.mono
+        ? s.mono_channel === "left"
+          ? "mono-left"
+          : s.mono_channel === "right"
+            ? "mono-right"
+            : "mono"
+        : "stereo";
   $("zoom-fit").textContent =
     wave.fitMode === "trim"
       ? "Trim start–end"
@@ -611,7 +623,7 @@ function waveFields() {
   }))
     setValue(id, (n / RATE).toFixed(5));
   $("wave-info").textContent =
-    `${((b - a) / RATE).toFixed(3)} s · 44.1 kHz · stereo`;
+    `${((b - a) / RATE).toFixed(3)} s · ${effectiveSampleFormat(s).rate / 1000} kHz · ${effectiveSampleFormat(s).bits}-bit · ${s.mono ? "mono" : sourceRenderFormat(s).channels === 1 ? "mono" : "stereo"}`;
 }
 function select(id, repaint = true) {
   if (id !== current().selected) {
@@ -1803,14 +1815,19 @@ for (const [id, key, min, max, integer] of [
   ["fine", "fine", -100, 100, true],
   ["attack", "attack_ms", 0, Number.MAX_VALUE, false],
   ["decay", "decay_ms", 0, Number.MAX_VALUE, false],
-  ["crush-rate", "crush_rate", 100, 44100, true],
+  ["crush-rate", "crush_rate", 0.1, 44.1, false],
   ["crush-bits", "crush_bits", 1, 32, true],
 ])
   listen(id, "change", async (e) => {
     const s = selected();
     if (!s) return;
     if (e.target.value.trim() === "" && key !== "key") {
-      e.target.value = s[key];
+      e.target.value =
+        key === "crush_rate"
+          ? effectiveSampleFormat(s).rate / 1000
+          : key === "crush_bits"
+            ? effectiveSampleFormat(s).bits
+            : s[key];
       throw Error("Enter a valid number");
     }
     const x =
@@ -1822,12 +1839,17 @@ for (const [id, key, min, max, integer] of [
         x > max ||
         (integer && !Number.isInteger(x)))
     ) {
-      e.target.value = s[key];
+      e.target.value =
+        key === "crush_rate"
+          ? effectiveSampleFormat(s).rate / 1000
+          : key === "crush_bits"
+            ? effectiveSampleFormat(s).bits
+            : s[key];
       throw Error(
         `Value must be ${min}–${max}${integer ? " (whole number)" : ""}`,
       );
     }
-    s[key] = x;
+    s[key] = key === "crush_rate" ? Math.round(x * 1000) : x;
     if (["attack_ms", "decay_ms"].includes(key) && s.audio) {
       const duration = ((bounds(s)[1] - bounds(s)[0]) / RATE) * 1000;
       s.attack_ms = Math.min(s.attack_ms, duration);
@@ -3339,8 +3361,8 @@ async function useTake(replace) {
     loop_end: take[0].length,
     reverse: false,
     normalization: null,
-    crush_rate: s.crush_rate ?? RATE,
-    crush_bits: s.crush_bits ?? 32,
+    crush_rate: Math.min(recordingFormat?.sample_rate ?? RATE, RATE),
+    crush_bits: recordingFormat?.bit_depth ?? 32,
     level: 0.5,
     audio_dirty: false,
   });
@@ -3878,7 +3900,13 @@ listen("wave-channels", "change", async (e) => {
   if (!s) return;
   if (e.target.value === "show-stereo") s.wave_view = "split";
   else {
-    s.mono = e.target.value === "mono";
+    s.mono = e.target.value.startsWith("mono");
+    s.mono_channel =
+      e.target.value === "mono-left"
+        ? "left"
+        : e.target.value === "mono-right"
+          ? "right"
+          : "mix";
     s.wave_view = "mixed";
   }
   await commit(s, false, true);

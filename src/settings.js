@@ -56,7 +56,7 @@ export function normalizePreferences(raw = {}) {
     -24,
   );
   if (
-    ![8000, 11025, 22050, 32000, 44100, 48000, 96000].includes(
+    ![8000, 11025, 12000, 22050, 32000, 44100, 48000, 96000].includes(
       record.sample_rate,
     ) ||
     ![8, 12, 16, 24, 32].includes(record.bit_depth)
