@@ -77,7 +77,23 @@ self.addEventListener("fetch", (e) => {
   )
     e.respondWith(
       caches
-        .match(e.request, { cacheName: CACHE })
-        .then((hit) => hit ?? fetch(e.request)),
+        .match(e.request, { cacheName: CACHE, ignoreVary: true })
+        .then(async (hit) => {
+          if (hit) return hit;
+          const url = new URL(e.request.url);
+          const root = new URL("./", self.location.href);
+          if (
+            e.request.mode === "navigate" &&
+            (url.pathname === root.pathname ||
+              url.pathname === new URL("index.html", root).pathname)
+          ) {
+            const index = await caches.match(new URL("index.html", root), {
+              cacheName: CACHE,
+              ignoreVary: true,
+            });
+            if (index) return index;
+          }
+          return fetch(e.request);
+        }),
     );
 });

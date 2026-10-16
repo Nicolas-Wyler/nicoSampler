@@ -71,6 +71,8 @@ for (const asset of assets) {
   hash.update(name);
   hash.update(await fs.readFile(path.join(web, name || "index.html")));
 }
+// Worker logic changes must also invalidate the offline cache version.
+hash.update(sw.replace(/const CACHE = "[^"]+"/, 'const CACHE = "CONTENT_HASH"'));
 const cache = "nicosampler-" + version + "-" + hash.digest("hex").slice(0, 12);
 sw = sw
   .replace(/const CACHE = "[^"]+"/, `const CACHE = "${cache}"`)
