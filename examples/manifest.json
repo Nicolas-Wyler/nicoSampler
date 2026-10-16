@@ -14,8 +14,8 @@
         "Original Circuit — Melodic"
       ],
       "rows": 16,
-      "bytes": 9737172,
-      "sha256": "838fd9d6b02b24c85acce8a8eed7ba000e2e1981d72944c8b3f9e6bf7c5ebc1b",
+      "bytes": 9738448,
+      "sha256": "a2ca11776b5160ce081e6dff26143ff7d4c815cf90f6ec46896b5e7918b6a835",
       "manifest": "project.nicosbank",
       "entries": [
         "programs/001-Original Circuit — Drums/001-Punch Kick.raw.wav",
@@ -60,8 +60,8 @@
         "Original Circuit — Drums"
       ],
       "rows": 10,
-      "bytes": 4290896,
-      "sha256": "d46258917a5e2744f0e5fe90e04ed7cdd467e30cced7c4122e6ec34d6d45dc53",
+      "bytes": 4291706,
+      "sha256": "9a0b3b6574ebec4361f022441fcad0ae33fa4577d977e7e068172099c82dbeea",
       "manifest": "project.nicoprog",
       "entries": [
         "programs/001-Original Circuit — Drums/001-Punch Kick.raw.wav",
@@ -94,8 +94,8 @@
         "Original Circuit — Melodic"
       ],
       "rows": 6,
-      "bytes": 5446856,
-      "sha256": "f09930174d23f95f354a87cba00cf92e6819c4ae56716488b78dbb532ad36c22",
+      "bytes": 5447322,
+      "sha256": "bb33a9d2cf9acaac7aa855b0c57450a8f2b7ae5955807f45764830f9bc29e0ac",
       "manifest": "project.nicoprog",
       "entries": [
         "programs/001-Original Circuit — Melodic/001-Warm Bass.raw.wav",
@@ -120,8 +120,8 @@
         "Original Circuit — Full Kit"
       ],
       "rows": 16,
-      "bytes": 9737207,
-      "sha256": "e02f499edef566a92ef0eefc0103879e52132cbf5770534f49a0c8bb254f0eb9",
+      "bytes": 9738483,
+      "sha256": "de0012f025f4e5aeb40f7bc442dc03660c1b46c19fbd31857ca2f939d103eec7",
       "manifest": "project.nicoprog",
       "entries": [
         "programs/001-Original Circuit — Full Kit/001-Punch Kick.raw.wav",

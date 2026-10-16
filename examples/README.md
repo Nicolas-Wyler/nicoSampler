@@ -11,6 +11,10 @@ An original 16-voice kit generated entirely by the sampler's deterministic synth
 
 Drag a ZIP onto the landing screen or sample table, or use Load → Bank/Program. A bank replaces the open bank after confirmation; programs append tabs. Each archive contains its root project manifest, original raw WAVs, and non-destructive .nicosample containers in project-relative folders. Do not move individual assets out of their folders.
 
+## Colors
+
+Related hi-hats, toms, snare/clap/rim and percussion share preset colors across the bank and programs. Spread instruments use one color per range. Click a sample color marker to customize it.
+
 ## Playing
 
 At the default PC-keyboard octave, A/W/S/E/D/F/T/G/Z/H trigger kick/rim/snare/clap/closed hat/open hat/low tom/high tom/shaker/metal. U triggers the fifth chord, J the sweep, and K/O/L the looping pad. The open hat uses key-mono retrigger; it is not a closed/open mutual-choke group.

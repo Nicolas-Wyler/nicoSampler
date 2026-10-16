@@ -288,6 +288,15 @@ export function generateExampleKit(makeSample, rate = 44100) {
     s.audio = synth(index, rate, definition.seconds);
     Object.assign(s, {
       level: 0.5,
+      color_group: [
+        "kick", "snare", "snare", "snare", "hats", "hats", "toms", "toms",
+        "percussion", "percussion", "bass", "pluck", "chord", "fx", "pad", "bell",
+      ][index],
+      color: [
+        "#E4B36B", "#E8919E", "#E8919E", "#E8919E", "#77C7D3", "#77C7D3",
+        "#BC9CE6", "#BC9CE6", "#A9CB75", "#A9CB75", "#7CACE3", "#78C9A7",
+        "#D4A6D7", "#C4BD79", "#A6B4E7", "#DFA4BE",
+      ][index],
       trim_start: 0,
       trim_end: s.audio[0].length,
       loop_start: 0,

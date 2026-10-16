@@ -249,13 +249,17 @@ function enhanceScroll(element) {
     });
     return { track, thumb, axis };
   });
-  const observer = new ResizeObserver(syncScrollbars);
+  const observer = new ResizeObserver(scheduleScrollbars);
   const onScroll = () => {
     reveal();
     syncScrollbars();
   };
   scrolls.set(element, {
     tracks,
+    baseRight: parseFloat(getComputedStyle(element).paddingRight) || 0,
+    baseBottom: parseFloat(getComputedStyle(element).paddingBottom) || 0,
+    originalRight: element.style.paddingRight,
+    originalBottom: element.style.paddingBottom,
     observer,
     onScroll,
     cleanup: () => clearTimeout(activityTimer),
@@ -263,8 +267,17 @@ function enhanceScroll(element) {
   element.addEventListener("scroll", onScroll, { passive: true });
   observer.observe(element);
 }
+let scrollFrame = null;
+function scheduleScrollbars() {
+  if (scrollFrame != null) return;
+  scrollFrame = requestAnimationFrame(() => {
+    scrollFrame = null;
+    syncScrollbars();
+  });
+}
 function syncScrollbars() {
-  for (const [element, { tracks, observer, onScroll, cleanup }] of scrolls) {
+  for (const [element, metadata] of scrolls) {
+    const { tracks, observer, onScroll, cleanup } = metadata;
     if (!element.isConnected) {
       observer.disconnect();
       element.removeEventListener("scroll", onScroll);
@@ -276,16 +289,34 @@ function syncScrollbars() {
       scrolls.delete(element);
       continue;
     }
+    const coarse = matchMedia("(pointer: coarse)").matches;
+    const thickness = coarse ? 10 : 8;
+    const hasX = element.scrollWidth > element.clientWidth + 1;
+    const hasY = element.scrollHeight > element.clientHeight + 1;
+    // The table owns its right lane; ordinary scrollers reserve padding for tracks.
+    if (element.id !== "program-ribbon") {
+      for (const [axis, overflow, base, original] of [
+        ["Right", hasY, metadata.baseRight, metadata.originalRight],
+        ["Bottom", hasX, metadata.baseBottom, metadata.originalBottom],
+      ]) {
+        if (axis === "Right" && element.id === "table-wrap") continue;
+        const value =
+          overflow && base < thickness + 1 ? `${thickness + 1}px` : original;
+        if (element.style[`padding${axis}`] !== value)
+          element.style[`padding${axis}`] = value;
+      }
+    }
     const modal = element.tagName === "DIALOG" && element.matches(":modal");
     const r = element.getBoundingClientRect();
     for (const { track, thumb, axis } of tracks) {
       const extent = axis === "x" ? element.scrollWidth : element.scrollHeight,
         visible = axis === "x" ? element.clientWidth : element.clientHeight,
-        size =
+        size = Math.max(
+          0,
           (axis === "x" ? r.width : r.height) -
-          (matchMedia("(pointer: coarse)").matches ? 26 : 12);
-      const coarse = matchMedia("(pointer: coarse)").matches,
-        thickness = coarse ? 24 : axis === "x" ? 12 : 8;
+            ((axis === "x" ? hasY : hasX) ? thickness + 1 : 0) -
+            2,
+        );
       track.style[axis === "x" ? "height" : "width"] = thickness + "px";
       thumb.style[axis === "x" ? "height" : "width"] = thickness + "px";
       const visibleTrack = r.width > 0 && r.height > 0 && extent > visible + 1;
@@ -317,7 +348,11 @@ function syncScrollbars() {
       track.style.left =
         (axis === "x" ? r.left : r.right - thickness - 1) + "px";
       track.style.top =
-        (axis === "x" ? r.bottom - thickness - 1 : r.top) + "px";
+        (axis === "x"
+          ? element.id === "program-ribbon"
+            ? r.bottom + 1
+            : r.bottom - thickness - 1
+          : r.top) + "px";
       track.style[axis === "x" ? "width" : "height"] = Math.max(0, size) + "px";
       const thumbSize = Math.min(
         size,

@@ -26,9 +26,13 @@ Command/Ctrl+C, X and V copy, cut and paste rows between program tabs. A cut rem
 
 The onscreen piano always works independently of the selected PC/MIDI input. The computer keyboard supplies musical notes only when Input is PC Keyboard, except while editing a text/number field. None disables PC and external MIDI note input. Selecting an external MIDI input disables PC note input and routes notes from that device (or all devices when All MIDI inputs is selected). The channel selector supports All, None and individual channels. Available devices require browser permission and OS support.
 
-Each MIDI note has a stable color. Assigned piano keys use that color, and the thin marker to the left of M/S shows every assigned note as a separate segment, from low at the top to high at the bottom. Shared notes share colors across rows and programs. Unassigned rows have a neutral marker; note labels remain available alongside the colors.
+Colors describe assignments rather than individual pitches. A spread range uses one solid color, shared by identical automatic ranges. Single-key samples inside a spread inherit its color; isolated single-note assignments receive their own. The piano retains its black and white keys with small colored bands; overlapping ranges appear as separate bands on shared keys.
+
+Click a row's color marker to open the custom color picker. Choose a swatch or enter a hex color, then Apply; Automatic removes the manual override. The manual color belongs to that sample and is saved in sample containers, programs and banks. It can add another band on a shared key without changing other samples. The example kit groups related sounds such as hi-hats, toms, snare/clap/rim and percussion with matching preset colors across its programs.
 
 Click a Key cell to learn a note. Spread assigns a range: Pitch learns root, lower, upper; other spread controls learn lower then upper. The collapsed cell shows low:high and rRoot on two lines. The custom menu options stay single-line. The main **Load → Sample** workflow retains its key-learning behavior for batches; direct drops create immediate default/container rows.
+
+Two fingers pan the onscreen piano horizontally; spreading/pinching the fingers zooms it. Entering the two-finger gesture releases sounding touches. The app blocks page zoom while retaining its own piano/waveform zoom. Touch note-learning dialogs leave the piano and its controls visible so you can choose root and range boundaries directly.
 
 Keyboard zoom is separate from browser-page zoom. The octave buttons move the PC keyboard range. The range fading, octave buttons and PC range label appear only for PC Keyboard input; other input modes show the piano without PC-range fading. Maximum keyboard magnification shows roughly one octave across the display; zooming out exposes the full MIDI range. Panic stops voices and ignores incoming MIDI for one second.
 

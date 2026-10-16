@@ -1,3 +1,5 @@
+import { installPageZoomGuard } from "./page-gestures.js";
+import { COLOR_PALETTE } from "./key-colors.js";
 import { acceptsInput } from "./input-routing.js";
 import { isSampleMuted } from "./sample-audibility.js";
 import { EXAMPLE_FX } from "./example-kit.js";
@@ -239,6 +241,118 @@ function updateBaseLatency() {
       ? `Base latency: ${(latency * 1000).toFixed(1)} ms`
       : "Base latency: unavailable";
   if (label.textContent !== text) label.textContent = text;
+}
+const SAMPLE_COLOR_SWATCHES = COLOR_PALETTE.map((color) => color.toUpperCase());
+function openSampleColor(s) {
+  if (!current().samples.includes(s)) return;
+  const program = current();
+  $("sample-color-dialog")?.close();
+  const dialog = document.createElement("dialog");
+  dialog.id = "sample-color-dialog";
+  dialog.className = "editor";
+  dialog.tabIndex = -1;
+  dialog.setAttribute("aria-label", "Sample color");
+  dialog.innerHTML = `<header class="dialog-header"><h2>Sample color</h2></header><p class="color-sample-name"></p><div class="sample-color-palette" role="group" aria-label="Color palette"></div><label class="field">Hex color<input id="sample-color-hex" type="text" maxlength="7" placeholder="#RRGGBB" autocomplete="off" spellcheck="false"></label><p class="sample-color-error" role="alert"></p><div class="dialog-actions"><button type="button" data-color-action="automatic">Automatic</button><span class="spacer"></span><button type="button" data-color-action="cancel">Cancel</button><button type="button" data-color-action="apply">Apply</button></div>`;
+  dialog.querySelector(".color-sample-name").textContent = s.name;
+  const palette = dialog.querySelector(".sample-color-palette"),
+    input = dialog.querySelector("input"),
+    error = dialog.querySelector(".sample-color-error");
+  Object.assign(palette.style, {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(44px, 1fr))",
+    gap: "8px",
+    margin: "16px 0",
+  });
+  error.style.minHeight = "1.3em";
+  error.style.color = "#FCA5A5";
+  input.value = s.color ?? "";
+  const swatches = [];
+  const markSelected = () => {
+    for (const button of swatches) {
+      const active = button.dataset.color === input.value.toUpperCase();
+      button.setAttribute("aria-pressed", String(active));
+      button.style.boxShadow = active
+        ? "0 0 0 2px var(--text, #E5E7EB)"
+        : "none";
+    }
+  };
+  for (const color of SAMPLE_COLOR_SWATCHES) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "sample-color-swatch";
+    button.dataset.color = color;
+    button.setAttribute("aria-label", color);
+    button.title = color;
+    Object.assign(button.style, {
+      background: color,
+      minWidth: "44px",
+      minHeight: "44px",
+      padding: "0",
+      border: "1px solid #26312B",
+      borderRadius: "6px",
+    });
+    button.addEventListener("click", () => {
+      input.value = color;
+      error.textContent = "";
+      markSelected();
+    });
+    swatches.push(button);
+    palette.append(button);
+  }
+  function apply(color) {
+    if (!state.programs.includes(program) || !program.samples.includes(s)) {
+      dialog.close();
+      return;
+    }
+    s.color = color;
+    touch(program);
+    checkpoint(s);
+    paint();
+    changed();
+    dialog.close();
+    status(
+      color
+        ? `Color set for ${s.name}.`
+        : `Automatic color restored for ${s.name}.`,
+    );
+  }
+  const applyInput = () => {
+    let value = input.value.trim();
+    if (/^[0-9a-f]{6}$/i.test(value)) value = "#" + value;
+    if (!value) return apply(null);
+    if (!/^#[0-9a-f]{6}$/i.test(value)) {
+      error.textContent = "Enter a six-digit color, for example #7DD3FC.";
+      input.focus();
+      return;
+    }
+    apply(value.toUpperCase());
+  };
+  input.addEventListener("input", () => {
+    error.textContent = "";
+    markSelected();
+  });
+  dialog.querySelector('[data-color-action="apply"]').onclick = applyInput;
+  dialog.querySelector('[data-color-action="automatic"]').onclick = () =>
+    apply(null);
+  dialog.querySelector('[data-color-action="cancel"]').onclick = () =>
+    dialog.close();
+  dialog.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      applyInput();
+    }
+  });
+  dialog.addEventListener("cancel", (e) => {
+    e.preventDefault();
+    dialog.close();
+  });
+  dialog.addEventListener("close", () => dialog.remove(), { once: true });
+  dialog.dataset.opened = String(performance.now());
+  document.body.append(dialog);
+  markSelected();
+  dialog.showModal();
+  input.focus();
+  input.select();
 }
 function status(text) {
   updateBaseLatency();
@@ -844,7 +958,32 @@ function paintPressed() {
       el.classList.toggle("pressed", pressedNotes.has(Number(el.dataset.note))),
     );
 }
+function updateLearningDock() {
+  const piano = document.querySelector(".keyboard-panel");
+  const rect = piano?.getBoundingClientRect();
+  const visible =
+    !$("sampler").hidden &&
+    rect &&
+    rect.height > 0 &&
+    getComputedStyle(piano).display !== "none";
+  const dock = visible
+    ? Math.max(
+        1,
+        Math.min(innerHeight - 1, Math.ceil(innerHeight - rect.top + 8)),
+      )
+    : 190;
+  const value = dock + "px";
+  if (
+    document.documentElement.style.getPropertyValue("--note-learning-dock") !==
+    value
+  )
+    document.documentElement.style.setProperty("--note-learning-dock", value);
+}
 function paintLearn() {
+  document.body.classList.toggle("note-learning", learn != null);
+  if (learn) document.body.dataset.learningType = learn.type;
+  else delete document.body.dataset.learningType;
+  updateLearningDock();
   let resized = false;
   document.querySelectorAll(".key-assignment").forEach((el) => {
     const row = el.closest("tr"),
@@ -988,6 +1127,7 @@ function openEditor(name, s = null) {
   d.dataset.opened = String(performance.now());
   d.focus();
   if (name === "trim") requestAnimationFrame(() => wave.draw());
+  if (name === "batch" || name === "spread") paintLearn();
 }
 function cancelLearning() {
   learn = null;
@@ -1151,6 +1291,7 @@ listen("spread-ok", "click", () => {
   $("spread-options").hidden = true;
   $("spread-prompt").hidden = false;
   spreadPrompt();
+  paintLearn();
   $("spread-dialog").focus();
 });
 listen("spread-remove", "click", () => {
@@ -1161,6 +1302,7 @@ listen("spread-remove", "click", () => {
     "Please play the key to assign this sample to.";
   $("spread-summary").textContent =
     "The current spread is kept until a key is chosen.";
+  paintLearn();
   $("spread-dialog").focus();
 });
 listen("spread-cancel", "click", cancelLearning);
@@ -1389,6 +1531,8 @@ thresholdMarker.addEventListener("keydown", (e) => {
   );
 });
 const ui = new ClassicUI({
+  isLearning: () => learn != null,
+  sampleColor: openSampleColor,
   viewChanged: (settings) => {
     if (current().landing) return;
     state.viewSettings = settings;
@@ -2635,8 +2779,9 @@ listen("midi-source", "change", stopAll);
 if (!navigator.requestMIDIAccess) {
   $("connect-midi").disabled = true;
 
-  $("midi-status").textContent =
-    "MIDI unavailable in this browser · touch & keyboard work";
+  $("connect-midi").title =
+    "Native MIDI is unavailable in this browser. Use Chrome/Edge on macOS or Windows, or play with touch/keyboard.";
+  $("midi-status").textContent = "MIDI unavailable";
 }
 // Computer keyboard: do not capture typing or command shortcuts.
 const keyMap = {
@@ -3696,26 +3841,15 @@ state.source = "PC Keyboard";
 state.programs[0].landing = true;
 void boot();
 
-// Keep the application canvas fixed. Piano and waveform have their own zoom controls.
-document.addEventListener(
-  "keydown",
-  (e) => {
-    if ((e.metaKey || e.ctrlKey) && ["+", "-", "=", "0"].includes(e.key))
-      e.preventDefault();
-  },
-  true,
-);
-document.addEventListener(
-  "wheel",
-  (e) => {
-    if (e.ctrlKey || e.metaKey) e.preventDefault();
-  },
-  { passive: false },
-);
-for (const type of ["gesturestart", "gesturechange", "gestureend"])
-  document.addEventListener(type, (e) => e.preventDefault(), {
-    passive: false,
-  });
+// Browser zoom is disabled; piano/waveform handlers still receive their own gestures.
+installPageZoomGuard();
+const scheduleLearningDock = () => requestAnimationFrame(updateLearningDock);
+window.addEventListener("resize", scheduleLearningDock);
+window.addEventListener("orientationchange", scheduleLearningDock);
+window.visualViewport?.addEventListener("resize", scheduleLearningDock);
+const learningDockObserver = new ResizeObserver(updateLearningDock);
+for (const panel of document.querySelectorAll(".keyboard-panel,.octavebar"))
+  learningDockObserver.observe(panel);
 
 initControls();
 initMasterKnob();

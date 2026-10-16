@@ -1556,3 +1556,41 @@ dialog.editor[open]:not(:modal) {
 #input-monitor:disabled {
   opacity: 0.75;
 }
+
+/* Keep incidental capability text from displacing musical controls. */
+body {
+  touch-action: manipulation;
+}
+.storagebar .midi-routing {
+  min-width: 0;
+  flex-shrink: 1;
+}
+#midi-status {
+  flex: 0 10 90px;
+  min-width: 0;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 650px) {
+  #midi-status {
+    display: none;
+  }
+  .storagebar .midi-routing {
+    flex: 0 1 auto;
+  }
+}
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea {
+    font-size: 16px;
+  }
+  /* Note learning is an exception to fullscreen touch editors: keep the piano dock. */
+  body.note-learning #spread-dialog[open],
+  body.note-learning #batch-dialog[open] {
+    bottom: var(--note-learning-dock, 190px) !important;
+    height: calc(100dvh - var(--note-learning-dock, 190px)) !important;
+    max-height: calc(100dvh - var(--note-learning-dock, 190px)) !important;
+  }
+}

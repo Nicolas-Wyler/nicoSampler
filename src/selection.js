@@ -20,7 +20,9 @@ export class RowSelection {
       this.anchor = program.selected ?? null;
     }
     if (
-      !this.mode && program.selected && !this.ids.has(program.selected) &&
+      !this.mode &&
+      program.selected &&
+      !this.ids.has(program.selected) &&
       (!this.allowEmpty || program.selected !== this.primary)
     ) {
       this.allowEmpty = false;

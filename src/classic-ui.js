@@ -2,7 +2,7 @@ import { noteName, assigned, clamp } from "./model.js";
 import { playbackParts, playbackMode } from "./workflows.js";
 import { createZoomInertia } from "./zoom-inertia.js";
 import { selectLabel } from "./controls.js";
-import { keyColor, sampleColorGradient } from "./key-colors.js";
+import { createKeyColorMap } from "./key-colors.js";
 const headers = [
   "Sample",
   "Env",
@@ -536,9 +536,25 @@ export class ClassicUI {
         if (!this.pinchPointers.size) this.zoomMotion.cancel();
         this.pinchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
         if (this.pinchPointers.size === 2) {
+          this.learningPianoTap = null;
           for (const id of this.pinchPointers.keys()) this.api.pointerOff(id);
-          this.pinchStart = { distance: distance(), zoom: this.keyboardZoom };
+          const points = [...this.pinchPointers.values()];
+          const midpoint = (points[0].x + points[1].x) / 2;
+          this.pinchStart = {
+            distance: distance(),
+            zoom: this.keyboardZoom,
+            contentX:
+              (area.scrollLeft + midpoint - area.getBoundingClientRect().left) /
+              this.keyboardZoom,
+          };
+          if (e.isTrusted) area.setPointerCapture(e.pointerId);
           this.zoomMotion.begin();
+          e.preventDefault();
+          e.stopImmediatePropagation();
+        } else if (this.pinchPointers.size > 2) {
+          for (const id of this.pinchPointers.keys()) this.api.pointerOff(id);
+          this.pinchStart = null;
+          this.zoomMotion.cancel();
           e.preventDefault();
           e.stopImmediatePropagation();
         }
@@ -549,16 +565,29 @@ export class ClassicUI {
       "pointermove",
       (e) => {
         if (!this.pinchPointers.has(e.pointerId)) return;
+        const pendingTap = this.learningPianoTap;
+        if (
+          pendingTap?.id === e.pointerId &&
+          Math.hypot(e.clientX - pendingTap.x, e.clientY - pendingTap.y) > 8
+        )
+          this.learningPianoTap = null;
         this.pinchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
         if (!this.pinchStart || this.pinchPointers.size !== 2) return;
         e.preventDefault();
         e.stopPropagation();
         const points = [...this.pinchPointers.values()];
+        const midpoint = (points[0].x + points[1].x) / 2;
         this.zoomMotion.update(
           (this.pinchStart.zoom * distance()) /
             Math.max(1, this.pinchStart.distance),
-          (points[0].x + points[1].x) / 2,
+          midpoint,
         );
+        // Keep the original content under the moving two-finger midpoint.
+        // Scale-only anchoring cannot pan when the finger distance is constant.
+        area.scrollLeft =
+          this.pinchStart.contentX * this.keyboardZoom -
+          (midpoint - area.getBoundingClientRect().left);
+        this.queueViewChanged();
       },
       { capture: true, passive: false },
     );
@@ -566,7 +595,8 @@ export class ClassicUI {
       this.pinchPointers.delete(e.pointerId);
       if (this.pinchPointers.size < 2 && this.pinchStart) {
         this.pinchStart = null;
-        this.zoomMotion.release();
+        if (e.type === "pointercancel") this.zoomMotion.cancel();
+        else this.zoomMotion.release();
       }
     };
     for (const event of ["pointerup", "pointercancel", "lostpointercapture"])
@@ -797,7 +827,7 @@ export class ClassicUI {
     const gutter =
       wrap.scrollHeight > wrap.clientHeight + 1
         ? matchMedia("(pointer: coarse)").matches
-          ? 25
+          ? 11
           : 9
         : 0;
     wrap.style.setProperty("--sample-scroll-gutter", gutter + "px");
@@ -842,7 +872,7 @@ export class ClassicUI {
             // Reserve the same 6px breathing room as the custom full-cell selector.
             width += textWidth(button ?? child, label) + 12;
           } else if (child.matches(".row-fixed-controls")) {
-            width += 100;
+            width += 106;
           } else if (child.matches(".sample-name")) {
             width += ROW_SIZE - 1;
           } else if (child.matches(".key-assignment,.pitch-drag")) {
@@ -876,6 +906,7 @@ export class ClassicUI {
   }
 
   render(state, current, learn) {
+    const keyColors = createKeyColorMap(current.samples);
     const api = this.api,
       programs = document.getElementById("program-ribbon");
     programs.replaceChildren(
@@ -1109,9 +1140,14 @@ export class ClassicUI {
         input.select();
       };
       const fixedControls = element("span", "row-fixed-controls");
-      const stripe = element("span", "row-key-colors");
-      stripe.style.backgroundImage = sampleColorGradient(s);
-      stripe.setAttribute("aria-hidden", "true");
+      const stripe = element("button", "row-key-colors");
+      stripe.style.backgroundImage = keyColors.gradientForSample(s);
+      stripe.setAttribute("aria-label", "Choose color for " + s.name);
+      stripe.title = "Choose color for " + s.name;
+      stripe.onclick = (event) => {
+        event.stopPropagation();
+        api.sampleColor?.(s);
+      };
       fixedControls.append(stripe, channels, led, handle, preview);
       cells[0].append(fixedControls, name);
       const env = element("button", "mini-preview");
@@ -1425,6 +1461,7 @@ export class ClassicUI {
     return el;
   }
   pianoRender(state, current) {
+    const keyColors = createKeyColorMap(current.samples);
     const pcSource = state.source === "PC Keyboard";
     const start = 0,
       end = 127,
@@ -1464,10 +1501,16 @@ export class ClassicUI {
             (pcSource && !pc.has(n) ? " dim" : ""),
           !black && n % 12 === 0 ? noteName(n) : "",
         );
-      if (button.classList.contains("assigned")) {
-        button.style.setProperty("--assigned-key-color", keyColor(n));
-        button.style.backgroundColor = keyColor(n);
-        button.style.color = "#102018";
+      const noteColors = keyColors.colorsForNote(n);
+      if (noteColors.length) {
+        const bands = element("span", "piano-key-colors");
+        bands.setAttribute("aria-hidden", "true");
+        for (const color of noteColors) {
+          const band = element("span");
+          band.style.backgroundColor = color;
+          bands.append(band);
+        }
+        button.append(bands);
       }
       button.dataset.note = n;
       button.setAttribute("aria-label", `${n} · ${noteName(n)}`);
@@ -1480,11 +1523,34 @@ export class ClassicUI {
         e.preventDefault();
         e.stopPropagation();
         button.setPointerCapture(e.pointerId);
-        this.api.pointerOn(e.pointerId, n);
+        if (
+          e.pointerType === "touch" &&
+          (this.api.isLearning?.() ??
+            document.body.classList.contains("note-learning"))
+        ) {
+          this.learningPianoTap = {
+            id: e.pointerId,
+            note: n,
+            x: e.clientX,
+            y: e.clientY,
+          };
+        } else this.api.pointerOn(e.pointerId, n);
       };
       for (const type of ["pointerup", "pointercancel", "lostpointercapture"])
         button.addEventListener(type, (e) => {
           e.stopPropagation();
+          const pendingTap = this.learningPianoTap;
+          if (pendingTap?.id === e.pointerId) {
+            this.learningPianoTap = null;
+            if (
+              e.type === "pointerup" &&
+              Math.hypot(e.clientX - pendingTap.x, e.clientY - pendingTap.y) <=
+                8 &&
+              (this.api.isLearning?.() ??
+                document.body.classList.contains("note-learning"))
+            )
+              this.api.pointerOn(e.pointerId, pendingTap.note);
+          }
           this.api.pointerOff(e.pointerId);
         });
       button.onkeydown = (e) => {

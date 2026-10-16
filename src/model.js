@@ -50,6 +50,8 @@ export function sample(name = "New sample", key = 60) {
     level: 1,
     mute: false,
     solo: false,
+    color: null,
+    color_group: null,
     max_velocity: false,
     pan: 0,
     mono: false,
@@ -169,6 +171,21 @@ export function validateSample(raw) {
     throw Error("Invalid source WAV");
   if (typeof s.mute !== "boolean" || typeof s.solo !== "boolean")
     throw Error("Invalid mute/solo setting");
+  if (
+    s.color != null &&
+    (typeof s.color !== "string" || !/^#[0-9a-f]{6}$/i.test(s.color))
+  )
+    throw Error("Invalid sample color");
+  if (s.color != null) s.color = s.color.toUpperCase();
+  if (
+    s.color_group != null &&
+    (typeof s.color_group !== "string" ||
+      !s.color_group.trim() ||
+      s.color_group.length > 80 ||
+      /[\u0000-\u001f\u007f]/.test(s.color_group))
+  )
+    throw Error("Invalid sample color group");
+  if (s.color_group != null) s.color_group = s.color_group.trim();
   // Explicit mute wins for ambiguous imported settings.
   if (s.mute) s.solo = false;
   delete s.effective_mute;
