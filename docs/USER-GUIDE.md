@@ -12,9 +12,9 @@ The same hierarchy applies when dropping files into the main sampler. Samples ap
 
 Use the program ribbon plus button for a new program. Drag a tab's left grip to reorder it. Its X closes it and asks about unsaved work. The asterisk means changes have not been exported. Browser autosave is separate from an exported project backup.
 
-Sample normally takes the remaining panel width. Other columns fit their text with padding. Envelope/Trigger/Overlap/Level/Max vel use full headers when space permits and compact labels otherwise. Knob and checkbox widths stay fixed. Text-column dividers can be dragged; double-click resets automatic sizing. Rows never become narrower than the panel; wide content scrolls inside it. Mute/Solo, MIDI activity, the drag grip and playback stay at the left edge while scrolling. Level is the final column and stays at the right edge.
+Sample normally takes the remaining panel width. Other columns fit their text with padding. Envelope/Trigger/Overlap/Level/Max vel use full headers when space permits and compact labels otherwise. Knob and checkbox widths stay fixed. Text-column dividers can be dragged; double-click resets automatic sizing. Rows never become narrower than the panel; wide content scrolls inside it. Mute/Solo, MIDI activity, the drag grip and playback stay at the left edge while scrolling. Level is the final column and stays at the right edge. The vertical scrollbar has its own reserved lane so it cannot cover Level.
 
-Click a row to select it; Command-click (Ctrl-click on Windows) toggles rows, and Shift-click selects a range. A long press on desktop or touch enters selection mode. Tap selected rows to deselect them, including the last one. Editing fades while grips and selected-row play remain usable. An outside click or Escape exits selection mode and retains a primary row.
+Click a row to select it; Command-click (Ctrl-click on Windows) toggles rows, and Shift-click selects a range. A long press on desktop or touch enters selection mode with that one row selected. This initial single selection keeps the mode open so you can add more rows. Once you have selected multiple rows, reducing the group back to one exits selection mode automatically. Reducing it to zero also exits and leaves no row selected. Editing fades while grips and selected-row play remain usable. An outside click or Escape exits selection mode.
 
 Drag a selected grip to move the selected group to the highlighted insertion line. The footer plus/minus controls remain at the left while scrolling. Minus first changes to red **Sure?**; the next click removes the selected rows. Clicking elsewhere or Escape cancels confirmation. Minus disappears when there are no rows.
 
@@ -24,11 +24,13 @@ Command/Ctrl+C, X and V copy, cut and paste rows between program tabs. A cut rem
 
 ## Playing and assigning notes
 
-The onscreen piano always works independently of the selected PC/MIDI input. The computer keyboard supplies musical notes except while editing a text/number field; Input None disables computer-keyboard notes. Connected external MIDI is independent of PC typing; the preferred MIDI device and program channel control routing. The channel selector supports All, None and individual channels. Available devices require browser permission and OS support.
+The onscreen piano always works independently of the selected PC/MIDI input. The computer keyboard supplies musical notes only when Input is PC Keyboard, except while editing a text/number field. None disables PC and external MIDI note input. Selecting an external MIDI input disables PC note input and routes notes from that device (or all devices when All MIDI inputs is selected). The channel selector supports All, None and individual channels. Available devices require browser permission and OS support.
+
+Each MIDI note has a stable color. Assigned piano keys use that color, and the thin marker to the left of M/S shows every assigned note as a separate segment, from low at the top to high at the bottom. Shared notes share colors across rows and programs. Unassigned rows have a neutral marker; note labels remain available alongside the colors.
 
 Click a Key cell to learn a note. Spread assigns a range: Pitch learns root, lower, upper; other spread controls learn lower then upper. The collapsed cell shows low:high and rRoot on two lines. The custom menu options stay single-line. The main **Load → Sample** workflow retains its key-learning behavior for batches; direct drops create immediate default/container rows.
 
-Keyboard zoom is separate from browser-page zoom. The octave buttons move the PC keyboard range. Maximum keyboard magnification shows roughly one octave across the display; zooming out exposes the full MIDI range. Panic stops voices and ignores incoming MIDI for one second.
+Keyboard zoom is separate from browser-page zoom. The octave buttons move the PC keyboard range. The range fading, octave buttons and PC range label appear only for PC Keyboard input; other input modes show the piano without PC-range fading. Maximum keyboard magnification shows roughly one octave across the display; zooming out exposes the full MIDI range. Panic stops voices and ignores incoming MIDI for one second.
 
 ## Editing audio
 

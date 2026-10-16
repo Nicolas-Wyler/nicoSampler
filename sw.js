@@ -1,4 +1,4 @@
-const CACHE = "nico-sampler-classic-v2-5285dcb29bcd";
+const CACHE = "nico-sampler-classic-v2-f60d667e083c";
 const ASSETS = [
   "./",
   "./index.html",
@@ -15,6 +15,8 @@ const ASSETS = [
   "./src/landing-import.js",
   "./src/landing.css",
   "./src/model.js",
+  "./src/key-colors.js",
+  "./src/input-routing.js",
   "./src/sample-audibility.js",
   "./src/storage.js",
   "./src/file-worker.js",

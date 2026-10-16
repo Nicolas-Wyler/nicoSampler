@@ -460,8 +460,8 @@ tfoot .add-sample-row td {
   position: relative;
   z-index: 2;
   display: inline-flex;
-  flex: 0 0 94px;
-  width: 94px;
+  flex: 0 0 100px;
+  width: 100px;
   height: 48px;
   align-items: center;
   gap: 2px;
@@ -483,4 +483,21 @@ tfoot .add-sample-row td {
   position: sticky;
   right: 0;
   z-index: 4;
+}
+
+/* Reserve the custom vertical track's own lane; sticky Level stays wholly usable. */
+#table-wrap {
+  padding-right: var(--sample-scroll-gutter, 0px);
+}
+
+#sample-table .row-key-colors {
+  flex: 0 0 4px;
+  width: 4px;
+  height: 48px;
+  pointer-events: none;
+}
+.piano-key.assigned.pressed {
+  background: var(--assigned-key-color) !important;
+  filter: brightness(1.2);
+  box-shadow: inset 0 0 0 3px #102018;
 }

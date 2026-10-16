@@ -1,3 +1,4 @@
+import { acceptsInput } from "./input-routing.js";
 import { isSampleMuted } from "./sample-audibility.js";
 import { EXAMPLE_FX } from "./example-kit.js";
 import { initMasterKnob, syncMasterKnob } from "./master-knob.js";
@@ -533,6 +534,7 @@ function rowSelect(id, event = {}) {
     );
   if (rowSelection.ids.size)
     p.selected = rowSelection.ids.has(id) ? id : [...rowSelection.ids].at(-1);
+  else p.selected = null;
   stopTrim();
   if (learn) cancelLearning();
   paint();
@@ -2579,8 +2581,7 @@ function refreshMidi() {
       if (
         performance.now() < midiMutedUntil ||
         current().landing ||
-        ["None", "PC Keyboard"].includes(state.source) ||
-        (state.source !== "all" && state.source !== input.id)
+        !acceptsInput(state.source, "midi", input.id)
       )
         return;
       const [statusByte, note, velocity] = e.data,
@@ -2818,7 +2819,7 @@ document.addEventListener(
       if (row) select(row.id);
       return;
     }
-    if (key in keyMap && state.source !== "None") {
+    if (key in keyMap && acceptsInput(state.source, "pc")) {
       const note = 60 + state.octave * 12 + keyMap[key];
       if (note < 0 || note > 127) return;
       e.preventDefault();

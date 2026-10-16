@@ -5,29 +5,52 @@ export class RowSelection {
     this.anchor = null;
     this.program = null;
     this.mode = false;
+    this.modeHadMultiple = false;
+    this.allowEmpty = false;
+    this.primary = null;
   }
   reconcile(program) {
     if (this.program !== program.id) {
       this.program = program.id;
       this.mode = false;
+      this.modeHadMultiple = false;
+      this.allowEmpty = false;
+      this.primary = program.selected ?? null;
       this.ids = new Set(program.selected ? [program.selected] : []);
       this.anchor = program.selected ?? null;
     }
-    if (!this.mode && program.selected && !this.ids.has(program.selected)) {
+    if (
+      !this.mode && program.selected && !this.ids.has(program.selected) &&
+      (!this.allowEmpty || program.selected !== this.primary)
+    ) {
+      this.allowEmpty = false;
       this.ids = new Set([program.selected]);
       this.anchor = program.selected;
     }
     const valid = new Set(program.samples.map((s) => s.id));
     this.ids = new Set([...this.ids].filter((id) => valid.has(id)));
-    if (!this.mode && !this.ids.size && valid.size)
+    if (!this.mode && !this.allowEmpty && !this.ids.size && valid.size)
       this.ids.add(
         valid.has(program.selected) ? program.selected : program.samples[0].id,
       );
     if (!valid.has(this.anchor)) this.anchor = [...this.ids][0] ?? null;
+    this.settleMode();
+    this.primary = program.selected ?? null;
     return this.ids;
+  }
+  settleMode() {
+    if (!this.mode) return;
+    if (this.ids.size > 1) this.modeHadMultiple = true;
+    if (!this.ids.size || (this.modeHadMultiple && this.ids.size <= 1)) {
+      this.mode = false;
+      this.allowEmpty = !this.ids.size;
+    }
   }
   select(id) {
     this.mode = false;
+    this.modeHadMultiple = false;
+    this.allowEmpty = !id;
+    this.primary = id ?? null;
     this.ids = new Set(id ? [id] : []);
     this.anchor = id;
     return this.ids;
@@ -41,6 +64,7 @@ export class RowSelection {
     if (this.ids.has(id)) this.ids.delete(id);
     else this.ids.add(id);
     this.anchor = id;
+    this.settleMode();
     return this.ids;
   }
   click(id, event, order) {
@@ -58,6 +82,7 @@ export class RowSelection {
       } else this.ids.add(id);
       this.anchor = id;
     } else this.select(id);
+    this.settleMode();
     return this.ids;
   }
 }

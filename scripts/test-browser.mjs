@@ -64,10 +64,19 @@ try {
         .locator("#sample-grid")
         .evaluate((e) => [
           e.getBoundingClientRect().width,
-          document.querySelector("#table-wrap").clientWidth,
+          document.querySelector("#table-wrap").clientWidth -
+            (parseFloat(getComputedStyle(document.querySelector("#table-wrap")).paddingRight) || 0),
         ]);
       assert.ok(size[0] >= size[1] - 1);
       assert.match(await page.locator("#table-head").textContent(), /Sample/);
+      // A full kit creates a vertical scrollbar; it must not intercept Level.
+      await page.waitForFunction(() => {
+        const dial = document.querySelector("#sample-table tr .level-cell .dial");
+        if (!dial) return false;
+        const r = dial.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.right - 1, r.top + r.height / 2);
+        return hit?.closest(".knob") === dial.closest(".knob");
+      });
       await page.locator("#enable-audio").click();
       await page.locator(".row-preview").first().click();
       await page.waitForFunction(

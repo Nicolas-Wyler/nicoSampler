@@ -2,6 +2,7 @@ import { noteName, assigned, clamp } from "./model.js";
 import { playbackParts, playbackMode } from "./workflows.js";
 import { createZoomInertia } from "./zoom-inertia.js";
 import { selectLabel } from "./controls.js";
+import { keyColor, sampleColorGradient } from "./key-colors.js";
 const headers = [
   "Sample",
   "Env",
@@ -80,9 +81,19 @@ export class ClassicUI {
     const tableWrap = document.getElementById("table-wrap");
     this.tableResizeObserver = new ResizeObserver(() => {
       const width = tableWrap.clientWidth;
-      if (width !== this.lastTableViewportWidth) {
+      const height = tableWrap.clientHeight;
+      if (
+        width !== this.lastTableViewportWidth ||
+        height !== this.lastTableViewportHeight
+      ) {
         this.lastTableViewportWidth = width;
-        if (width > 0) this.fitColumns();
+        this.lastTableViewportHeight = height;
+        if (width > 0) {
+          cancelAnimationFrame(this.tableLayoutFrame);
+          this.tableLayoutFrame = requestAnimationFrame(() =>
+            this.fitColumns(),
+          );
+        }
       }
       if (width > 0 && this.pendingViewSettings)
         this.restoreViewSettings(this.pendingViewSettings);
@@ -723,7 +734,12 @@ export class ClassicUI {
         ? fixedColumnWidth(i)
         : Math.max(width, this.manualWidths.get(i) ?? 0),
     );
-    const available = document.getElementById("table-wrap").clientWidth;
+    const wrap = document.getElementById("table-wrap"),
+      wrapStyle = getComputedStyle(wrap);
+    const available =
+      wrap.clientWidth -
+      (parseFloat(wrapStyle.paddingLeft) || 0) -
+      (parseFloat(wrapStyle.paddingRight) || 0);
     this.expandedHeaders = new Set();
     const proposed = this.widths.map((width, i) =>
       LOCKED_COLUMNS.has(i)
@@ -777,6 +793,14 @@ export class ClassicUI {
     }
   }
   fitColumns() {
+    const wrap = document.getElementById("table-wrap");
+    const gutter =
+      wrap.scrollHeight > wrap.clientHeight + 1
+        ? matchMedia("(pointer: coarse)").matches
+          ? 25
+          : 9
+        : 0;
+    wrap.style.setProperty("--sample-scroll-gutter", gutter + "px");
     // Measure intrinsic content, never the stretched width of a full-cell control.
     const measure = document.createElement("canvas").getContext("2d");
     const px = (value) => parseFloat(value) || 0;
@@ -818,7 +842,7 @@ export class ClassicUI {
             // Reserve the same 6px breathing room as the custom full-cell selector.
             width += textWidth(button ?? child, label) + 12;
           } else if (child.matches(".row-fixed-controls")) {
-            width += 94;
+            width += 100;
           } else if (child.matches(".sample-name")) {
             width += ROW_SIZE - 1;
           } else if (child.matches(".key-assignment,.pitch-drag")) {
@@ -1085,7 +1109,10 @@ export class ClassicUI {
         input.select();
       };
       const fixedControls = element("span", "row-fixed-controls");
-      fixedControls.append(channels, led, handle, preview);
+      const stripe = element("span", "row-key-colors");
+      stripe.style.backgroundImage = sampleColorGradient(s);
+      stripe.setAttribute("aria-hidden", "true");
+      fixedControls.append(stripe, channels, led, handle, preview);
       cells[0].append(fixedControls, name);
       const env = element("button", "mini-preview");
       env.setAttribute("aria-label", "Edit envelope for " + s.name);
@@ -1398,6 +1425,7 @@ export class ClassicUI {
     return el;
   }
   pianoRender(state, current) {
+    const pcSource = state.source === "PC Keyboard";
     const start = 0,
       end = 127,
       whites = [];
@@ -1433,9 +1461,14 @@ export class ClassicUI {
           "piano-key" +
             (black ? " black" : "") +
             (current.samples.some((s) => assigned(s, n)) ? " assigned" : "") +
-            (!pc.has(n) ? " dim" : ""),
+            (pcSource && !pc.has(n) ? " dim" : ""),
           !black && n % 12 === 0 ? noteName(n) : "",
         );
+      if (button.classList.contains("assigned")) {
+        button.style.setProperty("--assigned-key-color", keyColor(n));
+        button.style.backgroundColor = keyColor(n);
+        button.style.color = "#102018";
+      }
       button.dataset.note = n;
       button.setAttribute("aria-label", `${n} · ${noteName(n)}`);
       button.style.width = (black ? width * 0.64 : width) + "px";
@@ -1471,10 +1504,11 @@ export class ClassicUI {
       this.piano.append(button);
     }
     this.applyPianoZoom();
+    document.getElementById("octave-label").hidden = !pcSource;
     document.getElementById("octave-label").textContent =
       `PC keyboard: ${noteName(Math.max(0, 60 + state.octave * 12))}–${noteName(Math.min(127, 74 + state.octave * 12))}`;
     for (const id of ["octave-down", "octave-up"])
-      document.getElementById(id).hidden = false;
+      document.getElementById(id).hidden = !pcSource;
     document.getElementById("octave-down").disabled = state.octave <= -5;
     document.getElementById("octave-up").disabled = state.octave >= 5;
   }
