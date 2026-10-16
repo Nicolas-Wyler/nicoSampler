@@ -1,4 +1,4 @@
-const CACHE = "nico-sampler-classic-v2-4b79b2bc6722";
+const CACHE = "nico-sampler-classic-v2-cef0feca7aef";
 const ASSETS = [
   "./",
   "./index.html",
