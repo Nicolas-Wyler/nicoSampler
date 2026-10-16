@@ -52,6 +52,9 @@ for (const name of ["chromium", "webkit"]) {
     await page.waitForFunction(
       () => !document.querySelector("#spread-open").disabled,
     );
+    await page.locator("#enable-audio").click();
+    await page.waitForFunction(() => document.querySelector("#enable-audio").hidden);
+    await page.waitForFunction(() => /voices/.test(document.querySelector("#engine-status").textContent));
     await page.locator("#connect-midi").click();
     await page.waitForFunction(() => !!testMidiInput.onmidimessage);
     const send = (data) =>
