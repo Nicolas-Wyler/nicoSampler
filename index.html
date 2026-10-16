@@ -15,6 +15,8 @@
     <title>Minimal Sampler · Classic</title>
   </head>
   <body>
+    <button id="offline-status" type="button" role="status" aria-live="polite">Preparing offline copy…</button>
+    <script type="module" src="./src/offline-install.js"></script>
     <section id="landing" aria-label="Start a program">
       <button id="landing-drop" aria-label="Import bank, programs or samples">
         <strong>Drop files here</strong>
@@ -859,8 +861,7 @@
       <p>
         Autosave and recorded takes use this version’s separate browser
         database. Clearing browser storage or private-mode cleanup can erase
-        them; download banks and recordings for backups. After the first full
-        online visit the app works offline. Installation as a PWA is optional.
+        them; download banks and recordings for backups. On iPhone/iPad, open the Home Screen app online once and wait for “Ready offline” before disconnecting. Installation as a PWA is optional.
       </p>
       <h3>Platform boundaries</h3>
       <p>

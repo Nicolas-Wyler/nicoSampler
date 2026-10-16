@@ -71,3 +71,5 @@ Save → Resample renders selected samples with processing applied, to WAV or MP
 Use downloaded ZIP backups to move between browsers/computers. Browser-local recovery and the sampler clipboard are tied to origin, port and profile; private browsing or clearing browser data can remove them.
 
 Piano key highlights follow input key-down/key-up, independently of sounding voices. One-shots, sustain and release tails can continue after the highlight clears; row playback indicators still show the sounding samples. A key stays highlighted while another input channel or the on-screen keyboard still holds that note.
+
+For offline installation on iPhone/iPad, add the app to the Home Screen, then launch that Home Screen icon while still online. Keep it open until **Ready offline** confirms that the app, audio engine, encoders and example files are all cached in that installation. Safari and the Home Screen app may use separate storage. If the download is interrupted, reconnect and tap the offline warning to retry. iOS can still remove website data when storage is cleared or under storage pressure; keep exported banks as backups.

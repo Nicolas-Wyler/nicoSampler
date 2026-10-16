@@ -3632,10 +3632,7 @@ listen("install", "click", async () => {
     $("install").hidden = true;
   }
 });
-if ("serviceWorker" in navigator)
-  navigator.serviceWorker
-    .register(new URL("../sw.js", import.meta.url))
-    .catch((e) => status("Offline cache unavailable: " + e.message));
+
 async function boot() {
   try {
     view =

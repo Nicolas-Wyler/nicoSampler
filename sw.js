@@ -1,4 +1,4 @@
-const CACHE = "nico-sampler-classic-v2-9336642b36de";
+const CACHE = "nico-sampler-classic-v2-863d24479d69";
 const ASSETS = [
   "./",
   "./index.html",
@@ -8,6 +8,7 @@ const ASSETS = [
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./src/app.js",
+  "./src/offline-install.js",
   "./src/example-kit.js",
   "./src/master-knob.js",
   "./src/input-monitor.js",
@@ -51,11 +52,23 @@ const ASSETS = [
   "./THIRD_PARTY_NOTICES.md",
   "./LICENSE",
 ];
+async function cacheAssets(cache, missingOnly = false) {
+  for (let offset = 0; offset < ASSETS.length; offset += 4) {
+    await Promise.all(ASSETS.slice(offset, offset + 4).map(async (asset) => {
+      const url = new URL(asset, self.location.href);
+      if (missingOnly && await cache.match(url, { ignoreVary: true })) return;
+      for (let attempt = 0; ; attempt++) {
+        try { await cache.add(new Request(url, { cache: "reload" })); return; }
+        catch (error) { if (attempt >= 2) throw error; }
+      }
+    }));
+  }
+}
 self.addEventListener("install", (e) =>
   e.waitUntil(
     caches
       .open(CACHE)
-      .then((c) => c.addAll(ASSETS))
+      .then((c) => cacheAssets(c))
       .then(() => self.skipWaiting()),
   ),
 );
@@ -99,4 +112,27 @@ self.addEventListener("fetch", (e) => {
           return fetch(e.request);
         }),
     );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type !== "OFFLINE_STATUS") return;
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(CACHE);
+      if (event.data.repair) {
+        try { await cacheAssets(cache, true); }
+        catch { /* Report incomplete state below so the user can retry. */ }
+      }
+      const present = await Promise.all(
+        ASSETS.map((asset) =>
+          cache.match(new URL(asset, self.location.href), { ignoreVary: true }),
+        ),
+      );
+      event.ports[0]?.postMessage({
+        ready: present.every(Boolean),
+        cached: present.filter(Boolean).length,
+        total: ASSETS.length,
+      });
+    })(),
+  );
 });
