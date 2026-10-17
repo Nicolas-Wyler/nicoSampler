@@ -4068,6 +4068,7 @@ async function boot() {
   // localhost URL to a native .sampler.zip bundle.  This keeps conversion and
   // playback in the GitHub sampler format; the helper only serves the bundle.
   const launchUrl = new URLSearchParams(location.search).get("projectUrl");
+  let launchedProject = false;
   if (launchUrl) {
     try {
       const response = await fetch(launchUrl, { cache: "no-store" });
@@ -4075,12 +4076,16 @@ async function boot() {
       const blob = await response.blob();
       const name = decodeURIComponent(launchUrl.split("/").pop() || "project.sampler.zip");
       await importLanding([new File([blob], name, { type: "application/zip" })]);
+      // A launcher URL is an explicit project choice.  Do not let the
+      // browser's last recovery session overwrite the imported project below.
+      launchedProject = true;
       history.replaceState({}, "", location.pathname);
     } catch (error) {
       report(Error("The browser sampler could not load this project: " + error.message));
     }
   }
   try {
+    if (launchedProject) return;
     const saved = await loadRecovery();
     if (saved) {
       // Validate metadata before accepting a persisted session, retaining browser-local PCM separately.
