@@ -21,7 +21,13 @@ new MutationObserver(placeButton).observe(document.getElementById("sampler"), {
   attributes: true,
   attributeFilter: ["hidden"],
 });
-function show(text, enabled = false) {
+function show(text, enabled = false, action = "none") {
+  button.dataset.action = action;
+  button.title = action === "check" ? "Check for updates" : text;
+  button.setAttribute(
+    "aria-label",
+    action === "check" ? "Check for updates" : text,
+  );
   clearTimeout(hideTimer);
   button.hidden = false;
   button.disabled = !enabled;
@@ -82,11 +88,11 @@ async function checkUpdates() {
     if (!response.ok) throw Error("Update check unavailable");
     const remote = /const CACHE = "([^"]+)"/.exec(await response.text())?.[1];
     if (!remote) throw Error("Invalid update response");
-    if (remote !== local.version) show("Update", true);
+    if (remote !== local.version) show("Update", true, "update");
     else {
       show("No updates found");
       hideTimer = setTimeout(() => {
-        if (!updating) button.hidden = true;
+        if (!updating) show("↻", true, "check");
       }, 3000);
     }
   } catch (error) {
@@ -131,16 +137,20 @@ async function applyUpdate() {
     await saveBeforeUpdate();
     location.reload();
   } catch (error) {
-    show(error.message + " · Retry", true);
+    show(error.message + " · Retry", true, "update");
     button.style.setProperty("--progress", "0%");
   } finally {
     updating = false;
   }
 }
-button.addEventListener("click", () => void applyUpdate());
+button.addEventListener("click", () => {
+  if (button.dataset.action === "check") void checkUpdates();
+  else void applyUpdate();
+});
 async function prepare() {
   if (preparing) return;
   preparing = true;
+  show(navigator.onLine ? "Checking…" : "Offline");
   badge.hidden = false;
   delete badge.dataset.error;
   badge.textContent = "Downloading offline copy… Keep this app open";
@@ -170,6 +180,8 @@ async function prepare() {
       if (!badge.dataset.error) badge.hidden = true;
     }, 12000);
   } catch (error) {
+    if (!registration)
+      show(navigator.onLine ? "Update check unavailable" : "Offline");
     badge.dataset.error = "true";
     badge.textContent = "Offline copy not ready — connect and tap to retry";
     badge.title = error.message;

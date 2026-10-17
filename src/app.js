@@ -69,7 +69,7 @@ import {
   validateBank,
   validateSample,
 } from "./model.js";
-import { AudioController } from "./audio.js";
+import { AudioController, requestSystemAudio } from "./audio.js";
 import {
   saveRecovery,
   loadRecovery,
@@ -3105,6 +3105,7 @@ inputMonitor = new InputMonitor({
   onState: () => updateRecordButtons(),
   onError: report,
 });
+let recorderOwnsMonitor = false;
 listen("record-open", "click", async () => {
   if (finishingRecording)
     throw Error("Wait for the recording to finish processing.");
@@ -3124,17 +3125,21 @@ listen("record-open", "click", async () => {
     sampleId: s.id,
     makeNew: choice === "Make New Row",
   };
+  recorderOwnsMonitor = !inputMonitor.active && !inputMonitor.wanted;
   restoreRecordingSettings();
   refreshTakes();
   drawThreshold();
   $("record-dialog").show();
   $("record-dialog").dataset.opened = String(performance.now());
-  if (!inputConnected) await connectRecordingInput();
-  else audio.send({ type: "inputMode", mode: state.record.mode });
+  void refreshRecordingDevices();
+  await inputMonitor.activate();
+  audio.send({ type: "inputMode", mode: state.record.mode });
 });
 async function closeRecorder() {
   await finishActiveCapture();
-  if (!inputMonitor?.active) await disconnectRecordingInput();
+  if (recorderOwnsMonitor) await inputMonitor.deactivate();
+  if (!inputMonitor.active && inputConnected) await disconnectRecordingInput();
+  recorderOwnsMonitor = false;
   $("record-dialog").close();
   updateRecordButtons();
 }
@@ -3142,13 +3147,51 @@ listen("record-close", "click", closeRecorder);
 $("record-dialog").addEventListener("cancel", () => {
   void closeRecorder().catch(report);
 });
+const SYSTEM_AUDIO_DEVICE = "__system_audio__";
+function populateRecordingDevices(devices) {
+  const preferred = state.record.device ?? "";
+  const inputs = devices.filter((d) => d.kind === "audioinput");
+  $("record-device").replaceChildren(
+    option("", "System default"),
+    ...inputs.map((d, i) =>
+      option(d.deviceId, d.label || `Audio input ${i + 1}`),
+    ),
+    option(SYSTEM_AUDIO_DEVICE, "Share tab / system audio…"),
+  );
+  if (
+    preferred &&
+    ![...$("record-device").options].some((o) => o.value === preferred)
+  )
+    $("record-device").append(
+      option(preferred, "Saved input (unavailable; using default)"),
+    );
+  $("record-device").value =
+    $("record-source").value === "system" ? SYSTEM_AUDIO_DEVICE : preferred;
+  syncControls();
+}
+async function refreshRecordingDevices() {
+  try {
+    populateRecordingDevices(
+      (await navigator.mediaDevices?.enumerateDevices()) ?? [],
+    );
+  } catch {
+    populateRecordingDevices([]);
+  }
+}
+navigator.mediaDevices?.addEventListener?.(
+  "devicechange",
+  () => void refreshRecordingDevices(),
+);
 async function connectRecordingInput({ monitor = false } = {}) {
   if (recording || armed || finishingRecording)
     throw Error("Finish recording before changing input.");
   if (inputConnecting) return inputConnecting;
   const epoch = ++inputConnectionEpoch;
   const source = $("record-source").value,
-    chosen = $("record-device").value;
+    chosen =
+      source === "system"
+        ? (state.record.device ?? "")
+        : $("record-device").value;
   if (state.record.source !== source || state.record.device !== chosen) {
     state.record.source = source;
     state.record.device = chosen;
@@ -3157,6 +3200,9 @@ async function connectRecordingInput({ monitor = false } = {}) {
   }
   inputConnected = false;
   $("record-status").textContent = "Connecting input…";
+  // Invoke the browser sharing picker within the selection click's activation.
+  const sharedCapture = source === "system" ? requestSystemAudio() : null;
+  sharedCapture?.catch(() => {});
   inputConnecting = (async () => {
     try {
       // Capture may be the first audio gesture; upload the current program too.
@@ -3168,6 +3214,7 @@ async function connectRecordingInput({ monitor = false } = {}) {
           source,
           chosen,
           $("record-mode").value,
+          sharedCapture,
         );
       } catch (error) {
         if (
@@ -3186,19 +3233,10 @@ async function connectRecordingInput({ monitor = false } = {}) {
         await audio.disconnectInput();
         return false;
       }
-      $("record-device").replaceChildren(
-        option("", "System default"),
-        ...devices.map((d) => option(d.deviceId, d.label || "Audio input")),
-      );
-      if (
-        chosen &&
-        ![...$("record-device").options].some((o) => o.value === chosen)
-      )
-        $("record-device").append(
-          option(chosen, "Saved input (unavailable; using default)"),
-        );
-      $("record-device").value = chosen;
+      populateRecordingDevices(devices);
       inputConnected = true;
+      if ($("record-dialog").open && !inputMonitor.active && !inputMonitor.busy)
+        await inputMonitor.activate();
       audio.send({ type: "inputMode", mode: $("record-mode").value });
       $("record-status").textContent = fallback
         ? "Saved input unavailable; using system default. Saved preference retained."
@@ -3216,6 +3254,10 @@ async function connectRecordingInput({ monitor = false } = {}) {
         );
       throw error;
     } finally {
+      if (!inputConnected && sharedCapture)
+        void sharedCapture
+          .then((stream) => stream.getTracks().forEach((track) => track.stop()))
+          .catch(() => {});
       inputConnecting = null;
       updateRecordButtons();
     }
@@ -3223,8 +3265,18 @@ async function connectRecordingInput({ monitor = false } = {}) {
   updateRecordButtons();
   return inputConnecting;
 }
-for (const id of ["record-source", "record-device"])
-  listen(id, "change", connectRecordingInput);
+listen("record-source", "change", () => {
+  $("record-device").value =
+    $("record-source").value === "system"
+      ? SYSTEM_AUDIO_DEVICE
+      : (state.record.device ?? "");
+  return connectRecordingInput();
+});
+listen("record-device", "change", () => {
+  $("record-source").value =
+    $("record-device").value === SYSTEM_AUDIO_DEVICE ? "system" : "mic";
+  return connectRecordingInput();
+});
 function updateRecordButtons() {
   const locked = recording || armed || finishingRecording;
   $("record-start").disabled = locked || !!inputConnecting;
@@ -4061,7 +4113,8 @@ function restoreRecordingSettings() {
     ![...$("record-device").options].some((o) => o.value === preferred)
   )
     $("record-device").append(option(preferred, "Saved audio input"));
-  $("record-device").value = preferred;
+  $("record-device").value =
+    state.record.source === "system" ? SYSTEM_AUDIO_DEVICE : preferred;
   $("record-mode").value = state.record.mode;
   syncRecordFormat();
   drawThreshold();

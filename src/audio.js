@@ -1,3 +1,17 @@
+export function requestSystemAudio() {
+  const media = navigator.mediaDevices;
+  if (!media?.getDisplayMedia)
+    return Promise.reject(
+      Error(
+        "System audio sharing is unavailable in this browser. Try desktop Chrome or Edge.",
+      ),
+    );
+  return media.getDisplayMedia({
+    video: true,
+    audio: true,
+    systemAudio: "include",
+  });
+}
 import { isSampleMuted } from "./sample-audibility.js";
 import { RATE, assigned, fitMarkers } from "./model.js";
 import { compileEngine, planar } from "./wasm-engine.js";
@@ -234,7 +248,7 @@ export class AudioController {
         if (!Number.isFinite(channel[i])) channel[i] = 0;
     return channels;
   }
-  async connectInput(source, device, mode) {
+  async connectInput(source, device, mode, sharedCapture = null) {
     await this.disconnectInput();
     await this.enable();
     const media = navigator.mediaDevices;
@@ -244,7 +258,7 @@ export class AudioController {
     if (source === "system") {
       if (!media.getDisplayMedia)
         throw Error("Shared audio capture is unavailable in this browser");
-      stream = await media.getDisplayMedia({ video: true, audio: true });
+      stream = await (sharedCapture ?? requestSystemAudio());
       if (!stream.getAudioTracks().length) {
         stream.getTracks().forEach((t) => t.stop());
         throw Error(
@@ -270,7 +284,7 @@ export class AudioController {
         this.send({ type: "recordStop" });
         this.onEvent({ type: "inputEnded" });
       };
-    return (await media.enumerateDevices()).filter(
+    return (await media.enumerateDevices().catch(() => [])).filter(
       (d) => d.kind === "audioinput",
     );
   }

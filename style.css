@@ -1608,3 +1608,21 @@ body {
 #app-update.landing-update {position:fixed; top:calc(env(safe-area-inset-top,0px) + 8px);right:10px;z-index:3000;}
 .update-spinner {display:inline-block;animation:update-spin 1s linear infinite;}
 @keyframes update-spin {to {transform:rotate(360deg)}}
+
+.record-input-row {grid-template-columns:minmax(0,1fr);}
+
+/* Keep essential controls available at every window width. */
+.brand-icon {display:grid;}
+.master {display:flex; flex-direction:column; gap:0; flex-shrink:0; line-height:12px;}
+#master-value {display:none;}
+#memory-info {display:inline; white-space:nowrap;}
+.program-header {gap:6px;}
+#program-ribbon {min-width:0;}
+.storagebar {flex-wrap:wrap;}
+@media(max-width:420px) { .output {flex-shrink:0;} .meter-row .meter {width:100px;} #app-update {font-size:10px;padding:3px 5px;min-width:0;} }
+#app-update {max-width:min(180px,32vw);overflow:hidden;text-overflow:ellipsis;}
+@media(max-width:420px) {
+  .input-monitor-control {width:100px;}
+  .octavebar {gap:3px;}
+  #octave-label {min-width:0;font-size:10px;}
+}

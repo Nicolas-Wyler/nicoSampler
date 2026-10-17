@@ -8,7 +8,7 @@ export function syncMasterKnob() {
   button.style.setProperty("--angle", `${-135 + value * 2.7}deg`);
   button.setAttribute("aria-valuenow", String(value));
   button.setAttribute("aria-valuetext", `${value}%`);
-  button.title = `Master: ${value}%. Drag vertically or use arrow keys. Double-click to reset.`;
+  button.title = `Master volume. Drag vertically or use arrow keys. Double-click to reset.`;
 }
 export function initMasterKnob() {
   if (initialized) return;

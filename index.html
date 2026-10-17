@@ -712,25 +712,19 @@
       <p class="hint">
         Input is not sent to speakers. Up to 3 minutes per take.
       </p>
-      <div class="fields two record-input-row">
+      <select id="record-source" hidden aria-hidden="true">
+        <option value="mic">Microphone / audio interface</option>
+        <option value="system">System audio / shared tab</option>
+      </select>
+      <div class="fields record-input-row">
         <label class="field"
           ><select
-            id="record-source"
-            aria-label="Source"
-            data-display-prefix="Source: "
-          >
-            <option value="mic">Microphone / audio interface</option>
-            <option value="system">
-              Shared tab / system audio (when supported)
-            </option>
-          </select></label
-        ><label class="field"
-          ><select
             id="record-device"
-            aria-label="Device"
-            data-display-prefix="Device: "
+            aria-label="Input"
+            data-display-prefix="Input: "
           >
             <option value="">System default</option>
+            <option value="__system_audio__">Share tab / system audio…</option>
           </select></label
         >
       </div>
