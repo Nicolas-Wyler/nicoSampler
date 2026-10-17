@@ -1,3 +1,4 @@
+import { installTouchHold } from "./controls.js";
 let initialized = false;
 const clamp = (value) => Math.max(0, Math.min(100, value));
 export function syncMasterKnob() {
@@ -23,7 +24,8 @@ export function initMasterKnob() {
     syncMasterKnob();
   };
   button.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0 || !event.isPrimary) return;
+    if (event.button !== 0 || !event.isPrimary || event.pointerType === "touch")
+      return;
     event.preventDefault();
     button.focus({ preventScroll: true });
     drag = {
@@ -42,6 +44,20 @@ export function initMasterKnob() {
       if (drag?.id === event.pointerId) drag = null;
     });
   }
+  let touchDrag;
+  installTouchHold(button, {
+    start: (e) => {
+      touchDrag = { y: e.clientY, value: Number(input.value) };
+    },
+    move: (e) => {
+      if (touchDrag && Math.abs(e.clientY - touchDrag.y) > 3)
+        set(touchDrag.value + ((touchDrag.y - e.clientY) * 100) / 150);
+    },
+    end: () => {
+      touchDrag = null;
+    },
+    tap: () => document.getElementById("sampler-settings-open")?.click(),
+  });
   button.addEventListener("keydown", (event) => {
     const steps = {
       ArrowUp: 1,

@@ -49,6 +49,14 @@ function renderMeter(element, peak, label) {
   element.style.background = "transparent";
   const parent = element.parentElement,
     db = amplitudeDb(peak);
+  parent.style.setProperty(
+    "--phone-meter-color",
+    db >= -6 ? "#f2695d" : db >= -15 ? "#edcf5f" : "#a8d970",
+  );
+  parent.style.setProperty(
+    "--phone-meter-strength",
+    String(Number(peak) > 0 ? 0.15 + 0.85 * dbPosition(db) : 0.08),
+  );
   parent.setAttribute("role", "meter");
   parent.setAttribute("aria-label", label);
   parent.setAttribute("aria-valuemin", METER_FLOOR_DB);

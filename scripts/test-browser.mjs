@@ -43,9 +43,14 @@ try {
     });
     // MIDI permission/discovery must be independent of audio startup.
     const midiPage = await browser.newPage();
+    midiPage.on("dialog", dialog => dialog.accept());
     try {
       await midiPage.addInitScript(() => {
         window.midiQA = { calls: [], access: { inputs: new Map() }, notes: [], deny: true };
+        midiQA.permission = { state: localStorage.getItem("qa-midi-permission") || "prompt", onchange: null };
+        Object.defineProperty(navigator, "permissions", { configurable: true,
+          value: { query: async () => midiQA.permission } });
+        if (midiQA.permission.state === "granted") midiQA.deny = false;
         const post = MessagePort.prototype.postMessage;
         MessagePort.prototype.postMessage = function (message, ...args) {
           if (message?.type === "on") midiQA.notes.push(message.note);
@@ -78,14 +83,20 @@ try {
       assert.equal(await midiPage.locator("#input-source").inputValue(), "None",
         "Permission denial preserves the explicit None routing choice");
       assert.ok(await midiPage.locator('#input-source option[value="PC Keyboard"]').count());
-      await midiPage.evaluate(() => { midiQA.deny = false; });
+      assert.equal(await midiPage.locator("#connect-midi").textContent(), "Allow MIDI");
       await midiPage.locator("#connect-midi").click();
-      await midiPage.waitForFunction(() => !document.querySelector("#toast").hidden
-        && document.querySelector("#toast").textContent.includes("No external MIDI device"));
-      assert.equal(await midiPage.locator("#input-routing-label").isVisible(), true,
-        "Explicit Connect exposes built-in PC Keyboard even without external MIDI");
-      assert.ok(await midiPage.locator('#input-source option[value="PC Keyboard"]').count());
-      assert.equal(await midiPage.locator("#connect-midi").isVisible(), true);
+      await midiPage.waitForFunction(() => document.querySelector("#toast").textContent.includes("site settings"));
+      assert.equal(await midiPage.evaluate(() => midiQA.calls.filter(x => x === "midi").length), 1,
+        "Denied access shows guidance rather than repeatedly prompting");
+      await midiPage.evaluate(() => {
+        midiQA.deny = false;
+        midiQA.permission.state = "granted";
+        localStorage.setItem("qa-midi-permission", "granted");
+        midiQA.permission.onchange();
+      });
+      await midiPage.waitForFunction(() => document.querySelector("#connect-midi").hidden);
+      assert.equal(await midiPage.locator("#input-source").inputValue(), "None",
+        "Automatic permission acquisition does not change routing");
       assert.equal((await midiPage.evaluate(() => midiQA.calls))[0], "midi",
         "MIDI permission is requested before audio startup");
       await midiPage.evaluate(() => {
@@ -102,7 +113,8 @@ try {
       assert.equal(await midiPage.locator("#input-routing-label").isVisible(), true);
       assert.equal(await midiPage.locator("#input-source").inputValue(), "qa-midi",
         "Disconnected external routing remains selected until explicit user choice");
-      assert.equal(await midiPage.locator("#connect-midi").isVisible(), true);
+      assert.equal(await midiPage.locator("#connect-midi").isVisible(), false,
+        "Granted MIDI access stays connected with zero ports");
       await midiPage.locator("#load-kind").selectOption("example");
       await midiPage.waitForFunction(() => document.querySelector("#sample-count").textContent === "16");
       await midiPage.locator("#input-source").selectOption("qa-midi");
@@ -120,7 +132,16 @@ try {
         .parentElement.getAttribute("aria-valuenow")) > -60);
       await midiPage.keyboard.up("a");
       assert.equal(await midiPage.locator("#midi-channel-label").isVisible(), false);
-      console.log(`${name}: MIDI zero-device PC recovery, request order, hotplug and real typing playback passed`);
+      await midiPage.waitForTimeout(300);
+      await midiPage.waitForFunction(() => document.querySelector("#save-status").textContent.includes("Saved"));
+      await midiPage.reload();
+      await midiPage.waitForFunction(() => midiQA.calls.includes("midi"));
+      assert.equal(await midiPage.evaluate(() => midiQA.calls.includes("audio")), false,
+        "Previously granted MIDI reconnects automatically without activating audio");
+      assert.equal(await midiPage.locator("#input-source").inputValue(), "PC Keyboard");
+      await midiPage.evaluate(() => { midiQA.permission.state = "denied"; midiQA.permission.onchange(); });
+      await midiPage.waitForFunction(() => document.querySelector("#connect-midi").textContent === "Allow MIDI");
+      console.log(`${name}: MIDI permission lifecycle, PC recovery, hotplug and real typing playback passed`);
     } finally { await midiPage.close(); }
     const page = await browser.newPage({
       viewport: { width: 1280, height: 800 },
@@ -141,6 +162,9 @@ try {
       await page.waitForFunction(
         () => document.querySelector("#sample-count").textContent === "16",
       );
+      assert.ok(await page.evaluate(() => Math.abs(document.querySelector('#keyboard').getBoundingClientRect().width /
+        document.querySelector('#keyboard-scroll').clientWidth - 1) < 0.01),
+        'Desktop piano retains the full-range zoom floor');
       const size = await page
         .locator("#sample-grid")
         .evaluate((e) => [
@@ -303,6 +327,13 @@ try {
       await page.waitForFunction(
         () => document.querySelector("#sample-count").textContent === "16",
       );
+      assert.equal(await page.locator('#duplicate-sample').isVisible(),false,
+        'Desktop duplication uses the keyboard shortcut');
+      await page.locator('#sample-table tr').first().locator('.sample-name').click();
+      await page.keyboard.press('Escape');
+      await page.keyboard.press('ControlOrMeta+d');
+      await page.waitForFunction(()=>document.querySelector('#sample-count').textContent==='17');
+      assert.equal(await page.locator('#sample-table tr.selected').count(),1);
       assert.deepEqual(errors, []);
       console.log(
         `${name}: landing, generated kit, WASM playback, layout, icon settings validation/routing/fold/recovery, Master and bank ZIP passed`,

@@ -52,15 +52,25 @@ export class ClassicUI {
     this.cols = document.getElementById("table-cols");
     this.piano = document.getElementById("keyboard");
     this.keyboardScroll = document.getElementById("keyboard-scroll");
-    this.keyboardZoom = 1;
+    this.keyboardMinZoom = /iPhone|iPod/i.test(navigator.userAgent)
+      ? 75 / 14
+      : 1;
+    this.phonePiano = /iPhone|iPod/i.test(navigator.userAgent);
+    this.externalKeyboardSeen = !this.phonePiano;
+    this.pianoTouchMode = "play";
+    this.playPointers = new Map();
+    this.keyboardHeight = null;
+    this.keyboardZoom = this.keyboardMinZoom;
     this.zoomMotion = createZoomInertia({
       getScale: () => this.keyboardZoom,
       setScale: (scale, x) => this.setKeyboardZoom(scale, x, true),
-      min: 1,
+      min: this.keyboardMinZoom,
       max: 75 / 7,
     });
     this.pinchPointers = new Map();
     this.installKeyboardZoom();
+    this.installPianoResize();
+    this.setPianoTouchMode("play", false);
     this.installTouchSelection();
     this.installRowDragging();
     document.addEventListener(
@@ -126,6 +136,83 @@ export class ClassicUI {
       collapsed ? "Expand piano" : "Fold piano",
     );
     button.title = collapsed ? "Expand piano" : "Fold piano";
+    document.getElementById("keyboard-mode").hidden =
+      !this.phonePiano || collapsed;
+  }
+  setPianoTouchMode(mode, save = true) {
+    this.zoomMotion.cancel();
+    for (const id of this.playPointers.keys()) this.api.pointerOff(id);
+    this.playPointers.clear();
+    this.pinchPointers.clear();
+    this.pinchStart = null;
+    this.pianoTouchMode = mode === "move" ? "move" : "play";
+    const panel = document.querySelector(".keyboard-panel"),
+      button = document.getElementById("keyboard-mode");
+    panel.dataset.touchMode = this.pianoTouchMode;
+    this.keyboardScroll.dataset.navigationLocked = String(
+      this.phonePiano && this.pianoTouchMode === "play",
+    );
+    button.textContent = this.pianoTouchMode === "play" ? "Play" : "Move";
+    button.setAttribute("aria-pressed", String(this.pianoTouchMode === "move"));
+    button.title = `Switch piano to ${this.pianoTouchMode === "play" ? "Move" : "Play"} mode`;
+    button.hidden = !this.phonePiano || panel.classList.contains("is-folded");
+    if (save) this.queueViewChanged();
+  }
+  setPianoHeight(value, save = true) {
+    const max = Math.max(90, Math.min(800, innerHeight / 2));
+    this.keyboardHeight = clamp(value, 90, max);
+    document
+      .querySelector(".keyboard-panel")
+      .style.setProperty("--piano-height", `${this.keyboardHeight}px`);
+    document.querySelectorAll(".piano-resize-handle").forEach((el) => {
+      el.setAttribute("aria-valuenow", String(Math.round(this.keyboardHeight)));
+      el.setAttribute("aria-valuemax", String(Math.round(max)));
+    });
+    if (save) this.queueViewChanged();
+  }
+  installPianoResize() {
+    for (const grip of document.querySelectorAll(".piano-resize-handle")) {
+      let start;
+      grip.addEventListener("pointerdown", (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        start = {
+          id: e.pointerId,
+          y: e.clientY,
+          height: document
+            .querySelector(".keyboard-panel")
+            .classList.contains("is-folded")
+            ? 90
+            : this.piano.getBoundingClientRect().height,
+        };
+        grip.setPointerCapture(e.pointerId);
+      });
+      grip.addEventListener("pointermove", (e) => {
+        if (start?.id === e.pointerId) {
+          const height = start.height + start.y - e.clientY;
+          this.setKeyboardCollapsed(height < 90);
+          this.setPianoHeight(height);
+        }
+      });
+      for (const type of ["pointerup", "pointercancel", "lostpointercapture"])
+        grip.addEventListener(type, () => (start = null));
+      grip.addEventListener("keydown", (e) => {
+        if (!["ArrowUp", "ArrowDown", "Home"].includes(e.key)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        this.setPianoHeight(
+          e.key === "Home"
+            ? 90
+            : this.piano.getBoundingClientRect().height +
+                (e.key === "ArrowUp" ? 10 : -10),
+        );
+      });
+    }
+    window.addEventListener("resize", () => {
+      if (this.keyboardHeight != null)
+        this.setPianoHeight(this.keyboardHeight, false);
+    });
   }
   getViewSettings() {
     if (!this.keyboardScroll.clientWidth && this.pendingViewSettings)
@@ -140,6 +227,8 @@ export class ClassicUI {
         collapsed: document
           .querySelector(".keyboard-panel")
           .classList.contains("is-folded"),
+        touchMode: this.pianoTouchMode,
+        ...(this.keyboardHeight != null ? { height: this.keyboardHeight } : {}),
         zoom: this.keyboardZoom,
         position:
           keyboard.scrollWidth > 0
@@ -171,17 +260,29 @@ export class ClassicUI {
     this.restoringView = true;
     const finite = (value, fallback, min, max) =>
       Number.isFinite(value) ? clamp(value, min, max) : fallback;
-    const zoom = finite(settings.keyboard?.zoom, 1, 1, 75 / 7),
+    const zoom = finite(
+        settings.keyboard?.zoom,
+        this.keyboardMinZoom,
+        this.keyboardMinZoom,
+        75 / 7,
+      ),
       position = finite(settings.keyboard?.position, 0.5, 0, 1);
     this.pendingViewSettings = {
       keyboard: {
         zoom,
         position,
         collapsed: settings.keyboard?.collapsed === true,
+        touchMode: settings.keyboard?.touchMode ?? "play",
+        ...(Number.isFinite(settings.keyboard?.height)
+          ? { height: settings.keyboard.height }
+          : {}),
       },
       tableScroll: finite(settings.tableScroll, 0, 0, 1),
       programScroll: finite(settings.programScroll, 0, 0, 1),
     };
+    this.setPianoTouchMode(settings.keyboard?.touchMode ?? "play", false);
+    if (Number.isFinite(settings.keyboard?.height))
+      this.setPianoHeight(settings.keyboard.height, false);
     this.setKeyboardCollapsed(settings.keyboard?.collapsed === true);
     this.keyboardZoom = zoom;
     this.viewRestoreFrame = requestAnimationFrame(() => {
@@ -252,12 +353,14 @@ export class ClassicUI {
       const pending = this.touchSelection;
       if (!pending || pending.pointerId !== event.pointerId) return;
       clearTimeout(pending.timer);
+      pending.target
+        .closest(".knob,.pitch-drag")
+        ?.classList.remove("touch-adjusting");
       this.touchSelection = null;
       const mode = this.api.selectionMode?.() ?? false;
       if (pending.dragging) return;
       if (
         cancel ||
-        pending.long ||
         pending.scrolling ||
         (mode && !pending.dragging && !pending.preview)
       ) {
@@ -266,7 +369,6 @@ export class ClassicUI {
         this.suppressSelectionClick = true;
         if (
           !cancel &&
-          !pending.long &&
           !pending.scrolling &&
           mode &&
           !pending.dragging &&
@@ -279,8 +381,7 @@ export class ClassicUI {
       "pointermove",
       (event) => {
         const pending = this.touchSelection;
-        if (!pending || pending.pointerId !== event.pointerId || pending.long)
-          return;
+        if (!pending || pending.pointerId !== event.pointerId) return;
         if (
           Math.hypot(event.clientX - pending.x, event.clientY - pending.y) <= 8
         )
@@ -292,10 +393,7 @@ export class ClassicUI {
         }
         if (pending.dragging || pending.scrolling) return;
         const mode = this.api.selectionMode?.() ?? false;
-        if (
-          pending.target.closest(".row-handle") ||
-          (!mode && pending.target.closest(".knob,.pitch-drag"))
-        ) {
+        if (pending.target.closest(".row-handle")) {
           pending.dragging = true;
           const replay = new PointerEvent("pointerdown", {
             bubbles: true,
@@ -313,6 +411,13 @@ export class ClassicUI {
       },
       true,
     );
+    document.addEventListener(
+      "touchmove",
+      (event) => {
+        if (this.touchSelection?.adjusting) event.preventDefault();
+      },
+      { capture: true, passive: false },
+    );
     document.addEventListener("pointerup", (event) => finish(event), {
       capture: true,
       passive: false,
@@ -326,7 +431,7 @@ export class ClassicUI {
     const isTouch = event.pointerType === "touch";
     if (
       event.selectionReplay ||
-      (!isTouch && event.pointerType !== "mouse") ||
+      !isTouch ||
       event.button !== 0 ||
       event.metaKey ||
       event.ctrlKey ||
@@ -350,27 +455,36 @@ export class ClassicUI {
       x: event.clientX,
       y: event.clientY,
       target: event.target,
-      long: false,
       dragging: false,
       scrolling: false,
       preview:
         mode && selected && Boolean(event.target.closest(".row-preview")),
     };
-    if (!mode)
+    this.touchSelection = pending;
+    const parameter = event.target.closest(".knob,.pitch-drag");
+    if (!mode && parameter)
       pending.timer = setTimeout(() => {
         if (
           this.touchSelection !== pending ||
-          pending.dragging ||
           pending.scrolling ||
-          this.rowDrag?.active
+          this.touchPointers.size > 1
         )
           return;
-        pending.long = true;
-        this.finishRowDrag(true);
-        this.suppressSelectionClick = true;
-        this.api.enterSelection?.(id);
-      }, 500);
-    this.touchSelection = pending;
+        pending.dragging = pending.adjusting = true;
+        parameter.classList.add("touch-adjusting");
+        const replay = new PointerEvent("pointerdown", {
+          bubbles: true,
+          cancelable: true,
+          pointerId: event.pointerId,
+          pointerType: "touch",
+          clientX: pending.x,
+          clientY: pending.y,
+          button: 0,
+          buttons: 1,
+        });
+        Object.defineProperty(replay, "selectionReplay", { value: true });
+        parameter.dispatchEvent(replay);
+      }, 350);
     return isTouch;
   }
   installRowDragging() {
@@ -534,6 +648,7 @@ export class ClassicUI {
       (e) => {
         if (!e.ctrlKey && !e.metaKey) return;
         e.preventDefault();
+        if (this.phonePiano && this.pianoTouchMode === "play") return;
         e.stopPropagation();
         this.zoomMotion.wheel(
           this.keyboardZoom * Math.exp(-e.deltaY * 0.005),
@@ -552,6 +667,7 @@ export class ClassicUI {
       "pointerdown",
       (e) => {
         if (e.pointerType !== "touch") return;
+        if (this.phonePiano && this.pianoTouchMode === "play") return;
         if (!this.pinchPointers.size) this.zoomMotion.cancel();
         this.pinchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
         if (this.pinchPointers.size === 2) {
@@ -577,12 +693,33 @@ export class ClassicUI {
           e.preventDefault();
           e.stopImmediatePropagation();
         }
+        if (this.phonePiano && this.pianoTouchMode === "move")
+          e.stopImmediatePropagation();
       },
       true,
     );
     area.addEventListener(
       "pointermove",
       (e) => {
+        if (this.phonePiano && this.pianoTouchMode === "play") {
+          if (this.playPointers.has(e.pointerId)) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            const target = document
+              .elementFromPoint(e.clientX, e.clientY)
+              ?.closest(".piano-key");
+            const next =
+              target && this.piano.contains(target)
+                ? Number(target.dataset.note)
+                : null;
+            if (next !== this.playPointers.get(e.pointerId)) {
+              this.api.pointerOff(e.pointerId);
+              this.playPointers.set(e.pointerId, next);
+              if (next != null) this.api.pointerOn(e.pointerId, next);
+            }
+          }
+          return;
+        }
         if (!this.pinchPointers.has(e.pointerId)) return;
         const pendingTap = this.learningPianoTap;
         if (
@@ -610,7 +747,22 @@ export class ClassicUI {
       },
       { capture: true, passive: false },
     );
+    area.addEventListener(
+      "touchmove",
+      (e) => {
+        if (
+          (this.phonePiano && this.pianoTouchMode === "play") ||
+          this.pinchStart
+        )
+          e.preventDefault();
+      },
+      { passive: false },
+    );
     const end = (e) => {
+      if (this.playPointers.has(e.pointerId)) {
+        this.playPointers.delete(e.pointerId);
+        this.api.pointerOff(e.pointerId);
+      }
       this.pinchPointers.delete(e.pointerId);
       if (this.pinchPointers.size < 2 && this.pinchStart) {
         this.pinchStart = null;
@@ -632,7 +784,7 @@ export class ClassicUI {
       area.clientWidth,
     );
     const relative = (area.scrollLeft + x) / this.keyboardZoom;
-    this.keyboardZoom = clamp(value, 1, 75 / 7);
+    this.keyboardZoom = clamp(value, this.keyboardMinZoom, 75 / 7);
     this.applyPianoZoom();
     area.scrollLeft = relative * this.keyboardZoom - x;
     this.queueViewChanged();
@@ -977,7 +1129,8 @@ export class ClassicUI {
       tr.addEventListener(
         "pointerdown",
         (e) => {
-          if (e.selectionReplay) return;
+          if (e.selectionReplay || e.target.matches("input.inline-name"))
+            return;
           if (this.deferTouchSelection(e, s.id, selection.has(s.id))) return;
           if (e.target.matches("input.inline-name")) return;
           const modified = e.metaKey || e.ctrlKey || e.shiftKey;
@@ -1477,7 +1630,8 @@ export class ClassicUI {
   }
   pianoRender(state, current) {
     const keyColors = createKeyColorMap(current.samples);
-    const pcSource = state.source === "PC Keyboard";
+    const pcSource =
+      state.source === "PC Keyboard" && this.externalKeyboardSeen;
     const start = 0,
       end = 127,
       whites = [];
@@ -1535,6 +1689,7 @@ export class ClassicUI {
           ? whites.filter((v) => v < n).length * width - width * 0.32
           : whites.indexOf(n) * width) + "px";
       button.onpointerdown = (e) => {
+        if (this.phonePiano && this.pianoTouchMode === "move") return;
         e.preventDefault();
         e.stopPropagation();
         button.setPointerCapture(e.pointerId);
@@ -1549,7 +1704,11 @@ export class ClassicUI {
             x: e.clientX,
             y: e.clientY,
           };
-        } else this.api.pointerOn(e.pointerId, n);
+        } else {
+          if (this.phonePiano && e.pointerType === "touch")
+            this.playPointers.set(e.pointerId, n);
+          this.api.pointerOn(e.pointerId, n);
+        }
       };
       for (const type of ["pointerup", "pointercancel", "lostpointercapture"])
         button.addEventListener(type, (e) => {

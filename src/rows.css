@@ -572,3 +572,5 @@ tfoot .add-sample-row td {
 #table-wrap {
   clip-path: inset(0 var(--sample-scroll-gutter, 0px) 0 0);
 }
+
+@media(pointer:coarse) { .master #master-knob {touch-action:pan-x pan-y;} }

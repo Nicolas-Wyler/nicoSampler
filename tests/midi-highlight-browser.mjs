@@ -35,6 +35,8 @@ for (const name of ["chromium", "webkit"]) {
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await page.addInitScript(() => {
+      Object.defineProperty(navigator, "permissions", { configurable: true,
+        value: { query: async () => ({ state: "prompt", onchange: null }) } });
       window.testMidiInput = {
         id: "test",
         name: "Test MIDI",
@@ -57,6 +59,7 @@ for (const name of ["chromium", "webkit"]) {
     await page.waitForFunction(() => /voices/.test(document.querySelector("#engine-status").textContent));
     await page.locator("#connect-midi").click();
     await page.waitForFunction(() => !!testMidiInput.onmidimessage);
+    await page.locator("#input-source").selectOption("test");
     const send = (data) =>
       page.evaluate((data) => testMidiInput.onmidimessage({ data }), data);
     const key = page.locator('.piano-key[data-note="60"]');

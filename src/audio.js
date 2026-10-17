@@ -65,8 +65,10 @@ export class AudioController {
   }
   async enable() {
     if (this.starting) {
-      await this.starting;
-      await this.context.resume();
+      // A touch-down startup may be waiting for iOS user activation. Resume in
+      // this gesture before awaiting that startup, otherwise neither can finish.
+      const resume = this.context.resume();
+      await Promise.all([this.starting, resume]);
       return;
     }
     if (this.context) {

@@ -39,6 +39,8 @@ try {
     page.setDefaultTimeout(15000);
     try {
       await page.addInitScript(() => {
+        Object.defineProperty(navigator, "permissions", { configurable: true,
+          value: { query: async () => ({ state: "prompt", onchange: null }) } });
         const C = window.AudioContext || window.webkitAudioContext;
         window.recorderQA = { requests: 0, streams: [], analysers: [] };
         // Recorder transport tests use a stable reported output latency. The
@@ -287,16 +289,15 @@ try {
       await page.mouse.down();
       await page.waitForTimeout(1400);
       await page.mouse.up();
-      assert(
-        await page
-          .locator("#recorded-takes-body")
-          .evaluate((e) => e.classList.contains("selection-mode")),
-      );
-      await rows.nth(1).locator("td").nth(2).click();
+      assert.equal(
+        await page.locator("#recorded-takes-body")
+          .evaluate((e) => e.classList.contains("selection-mode")), false,
+        "Long hold does not enter selection mode");
+      await rows.nth(1).locator("td").nth(2).click({ modifiers: ["Meta"] });
       assert.equal(
         await page.locator("#recorded-takes-body tr.selected").count(),
         2,
-        "tap immediately after longpress toggles another take",
+        "desktop modifier selection remains available after a long hold",
       );
       await page.locator("#record-status").click();
       await rows.last().locator(".take-delete").click();

@@ -5,6 +5,7 @@ export class RowSelection {
     this.anchor = null;
     this.program = null;
     this.mode = false;
+    this.explicitMode = false;
     this.modeHadMultiple = false;
     this.allowEmpty = false;
     this.primary = null;
@@ -13,6 +14,7 @@ export class RowSelection {
     if (this.program !== program.id) {
       this.program = program.id;
       this.mode = false;
+      this.explicitMode = false;
       this.modeHadMultiple = false;
       this.allowEmpty = false;
       this.primary = program.selected ?? null;
@@ -41,15 +43,17 @@ export class RowSelection {
     return this.ids;
   }
   settleMode() {
-    if (!this.mode) return;
+    if (!this.mode || this.explicitMode) return;
     if (this.ids.size > 1) this.modeHadMultiple = true;
     if (!this.ids.size || (this.modeHadMultiple && this.ids.size <= 1)) {
       this.mode = false;
+      this.explicitMode = false;
       this.allowEmpty = !this.ids.size;
     }
   }
   select(id) {
     this.mode = false;
+    this.explicitMode = false;
     this.modeHadMultiple = false;
     this.allowEmpty = !id;
     this.primary = id ?? null;
@@ -57,9 +61,10 @@ export class RowSelection {
     this.anchor = id;
     return this.ids;
   }
-  enter(id) {
+  enter(id, explicit = false) {
     this.select(id);
     this.mode = true;
+    this.explicitMode = explicit;
     return this.ids;
   }
   toggle(id) {

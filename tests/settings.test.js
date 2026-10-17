@@ -33,7 +33,7 @@ const fixture = () => {
   state.columnManual = { 0: 8000, 4: 131 };
   state.columnSizingVersion = 3;
   state.viewSettings = {
-    keyboard: { zoom: 6.2, position: 0.73 },
+    keyboard: { zoom: 6.2, position: 0.73, touchMode: "move", height: 215 },
     tableScroll: 0.61,
     programScroll: 0.47,
   };

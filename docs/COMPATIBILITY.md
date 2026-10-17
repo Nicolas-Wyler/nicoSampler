@@ -23,3 +23,9 @@ Known deliberate limits: physical iPhone verification remains pending; cross-win
 ## System-output recording
 
 The original Python sampler uses a native macOS Swift helper for its direct System Audio input. The dependency-free browser/PWA build does not include that native helper. It requests system audio through the browser screen-sharing picker; this requires choosing a tab/window/screen, and full system-audio availability depends on the browser/OS. The sampler processes audio only and does not record or upload screen video. Installing the PWA does not grant native capture access.
+
+MIDI permission is checked at startup where supported: existing grants reconnect automatically, prompt state uses Connect MIDI, and denied state explains Chrome site settings. Local PC Keyboard and None choices do not depend on Web MIDI.
+
+iPhone piano views are limited to two visible octaves at their widest zoom; scrolling still reaches all notes. Automated phone audio/zoom checks run in desktop WebKit with touch emulation; they do not certify physical iOS 18.3 audio routing or silent-switch behavior.
+
+On iPhone the piano uses explicit Play/Move modes. Safari has no keyboard attach/detach event: PC range hints are enabled after trusted key use outside editable fields and reset when leaving the app. This is usage detection, not hardware detection. Piano resize grips stay visible when folded, allowing a drag to reopen it; the height is bounded to half the window.

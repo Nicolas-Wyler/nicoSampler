@@ -7,73 +7,17 @@ export class RecordedTakesTable {
     this.api = api;
     this.selection = new RowSelection();
     this.confirm = null;
-    this.timer = null;
-    this.press = null;
-    this.suppressUntil = 0;
-    body.addEventListener("pointerdown", (e) => {
-      if (!this.longPressActive) this.suppressUntil = 0;
-      if (e.button !== 0 || !e.isPrimary || e.target.closest("input")) return;
-      const row = e.target.closest("[data-take-id]");
-      if (!row || api.locked()) return;
-      clearTimeout(this.timer);
-      this.press = { x: e.clientX, y: e.clientY, id: e.pointerId };
-      this.timer = setTimeout(() => {
-        this.selection.enter(row.dataset.takeId);
-        this.primary = row.dataset.takeId;
-        this.suppressUntil = performance.now() + 800;
-        this.longPressActive = true;
-        this.longPressPointerId = this.press?.id;
-        this.press = null;
-        this.render();
-      }, 500);
-    });
-    body.addEventListener("pointermove", (e) => {
-      if (
-        this.press &&
-        Math.hypot(e.clientX - this.press.x, e.clientY - this.press.y) > 8
-      )
-        this.cancelPress();
-    });
-    for (const type of ["pointerup", "pointercancel", "lostpointercapture"])
-      document.addEventListener(type, (e) => {
-        if (
-          this.longPressActive &&
-          e.pointerId === this.longPressPointerId &&
-          type !== "lostpointercapture"
-        ) {
-          this.suppressUntil = performance.now() + 350;
-          this.longPressActive = false;
-        }
-        this.cancelPress();
-      });
-    body.parentElement.addEventListener("scroll", () => this.cancelPress(), {
-      passive: true,
-    });
-    body.addEventListener(
-      "click",
-      (e) => {
-        if (performance.now() < this.suppressUntil) {
-          e.preventDefault();
-          e.stopImmediatePropagation();
-        }
-      },
-      true,
-    );
     document.addEventListener("pointerdown", (e) => {
       if (
         api.open() &&
         !e.target.closest("#recorded-takes-table") &&
-        !e.target.closest("#take-use") &&
+        !e.target.closest("#take-use,#takes-select") &&
         (this.selection.mode || this.selection.ids.size > 1)
       ) {
         this.selection.select(this.primary);
         this.render();
       }
     });
-  }
-  cancelPress() {
-    clearTimeout(this.timer);
-    this.press = null;
   }
   selected() {
     return this.entries().filter((t) => this.selection.ids.has(t.id));
@@ -101,6 +45,15 @@ export class RecordedTakesTable {
     this.render();
   }
   render() {
+    const selectButton = document.getElementById("takes-select");
+    if (selectButton) {
+      selectButton.hidden = !/iPhone|iPod|Android.*Mobile/i.test(
+        navigator.userAgent,
+      );
+      selectButton.textContent = this.selection.mode ? "Done" : "Select";
+      selectButton.disabled = this.api.locked();
+      selectButton.setAttribute("aria-pressed", String(this.selection.mode));
+    }
     const entries = this.entries();
     this.selection.reconcile({
       id: "recorded-takes",

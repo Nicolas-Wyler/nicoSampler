@@ -124,9 +124,15 @@ export function normalizePreferences(raw = {}) {
   if (!Number.isInteger(octave) || !Number.isInteger(sizingVersion))
     throw Error("Invalid integer application setting");
   const keyboard = view.keyboard ?? {};
-  if (keyboard.collapsed != null && typeof keyboard.collapsed !== "boolean") throw Error("Invalid keyboard fold state");
+  if (keyboard.collapsed != null && typeof keyboard.collapsed !== "boolean")
+    throw Error("Invalid keyboard fold state");
   if (typeof keyboard !== "object" || Array.isArray(keyboard))
     throw Error("Invalid keyboard view");
+  if (
+    keyboard.touchMode != null &&
+    !["play", "move"].includes(keyboard.touchMode)
+  )
+    throw Error("Invalid piano touch mode");
   return {
     version: 1,
     source: string(input.source ?? raw.source, "MIDI input", "PC Keyboard"),
@@ -139,6 +145,12 @@ export function normalizePreferences(raw = {}) {
     view: {
       keyboard: {
         collapsed: keyboard.collapsed === true,
+        ...(keyboard.touchMode != null
+          ? { touchMode: keyboard.touchMode }
+          : {}),
+        ...(keyboard.height != null
+          ? { height: number(keyboard.height, 90, 800, "piano height", 132) }
+          : {}),
         zoom: number(keyboard.zoom, 1, 75 / 7, "keyboard zoom", 1),
         position: number(keyboard.position, 0, 1, "keyboard position", 0.5),
       },

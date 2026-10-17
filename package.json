@@ -19,7 +19,10 @@
     "check:public": "node scripts/check-public.mjs",
     "pretest": "node scripts/build-examples.mjs",
     "preserve": "node scripts/refresh-cache.mjs",
-    "test:launcher": "node scripts/test-launcher.mjs"
+    "test:launcher": "node scripts/test-launcher.mjs",
+    "test:phone": "node scripts/test-phone-audio.mjs",
+    "test:touch": "node scripts/test-touch-controls.mjs",
+    "test:piano": "node scripts/test-phone-piano.mjs"
   },
   "devDependencies": {
     "playwright": "1.62.1"

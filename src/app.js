@@ -83,9 +83,12 @@ import { Waveform } from "./waveform.js";
 const $ = (id) => document.getElementById(id),
   listen = (id, type, fn) =>
     $(id)?.addEventListener(type, (e) => {
-      Promise.resolve()
-        .then(() => fn(e))
-        .catch(report);
+      // Keep browser-gated calls on the trusted event stack (not a later task).
+      try {
+        Promise.resolve(fn(e)).catch(report);
+      } catch (error) {
+        report(error);
+      }
     });
 let replaceTarget = null,
   rowValueKey = "level";
@@ -107,7 +110,6 @@ const history = new Map(),
   noteEpoch = new Map();
 let panicEpoch = 0,
   midiMutedUntil = 0,
-  midiPreferenceRestored = false,
   inputMonitor = null;
 const audio = new AudioController(audioEvent),
   codec = new FileCodec();
@@ -117,6 +119,10 @@ const current = () =>
 const rowSelection = new RowSelection(),
   auditions = new Map();
 const selectedIds = () => rowSelection.reconcile(current());
+const touchSelectionUI = /iPhone|iPod|Android.*Mobile/i.test(
+  navigator.userAgent,
+);
+document.body.classList.toggle("phone-ui", touchSelectionUI);
 const storedBytes = () => audioBytes(state.programs, state.takes ?? []);
 const projectedBytes = (audio, replacing = null, source = null) =>
   audioBytes(state.programs, state.takes ?? [], audio, replacing, source);
@@ -471,7 +477,6 @@ function captureViewSettings() {
     state.viewSettings = ui.getViewSettings();
 }
 function restoreSavedSettings() {
-  midiPreferenceRestored = true;
   restoreColumnWidths();
   restoreRecordingSettings();
 }
@@ -523,12 +528,41 @@ function inspector() {
   document
     .querySelectorAll(".samples-panel .toolbar button")
     .forEach((button) => {
-      if (button.id !== "duplicate-sample")
+      if (
+        ![
+          "duplicate-sample",
+          "mobile-select",
+          "mobile-copy",
+          "mobile-paste",
+          "mobile-delete",
+        ].includes(button.id)
+      )
         button.disabled = multi || button.disabled;
     });
   for (const id of ["new-sample", "fx-open", "demo"])
     if ($(id)) $(id).disabled = multi;
   $("duplicate-sample").disabled = !selectedIds().size;
+  const mobileMode = touchSelectionUI && rowSelection.mode;
+  if (!mobileMode) {
+    $("mobile-delete").dataset.armed = "";
+    $("mobile-delete").textContent = "Delete";
+    $("mobile-delete").classList.remove("confirm-delete");
+  }
+  $("mobile-select").hidden = !touchSelectionUI;
+  $("mobile-select").textContent = mobileMode ? "Done" : "Select";
+  $("mobile-select").disabled = !current().samples.length && !mobileMode;
+  $("mobile-select").setAttribute("aria-pressed", String(mobileMode));
+  for (const id of [
+    "mobile-copy",
+    "mobile-paste",
+    "mobile-delete",
+    "duplicate-sample",
+  ]) {
+    $(id).hidden = !mobileMode;
+    $(id).disabled = id !== "mobile-paste" && !selectedIds().size;
+  }
+  for (const id of ["fx-open", "spread-open", "record-open", "trim-open"])
+    $(id).hidden = mobileMode;
   for (const value of ["sample", "render"]) {
     const option = $("save-kind").querySelector(`[value="${value}"]`);
     if (option)
@@ -753,9 +787,11 @@ async function pasteSelectedRows(programId) {
   touch(destination);
   for (const copy of copies) checkpoint(copy);
   if (current() === destination) {
-    const mode = rowSelection.mode;
+    const mode = rowSelection.mode,
+      explicitMode = rowSelection.explicitMode;
     rowSelection.select(destination.selected);
     rowSelection.mode = mode;
+    rowSelection.explicitMode = explicitMode;
     rowSelection.ids = new Set(copies.map((s) => s.id));
   } else if (move && current() === source) rowSelection.select(source.selected);
   paint();
@@ -778,10 +814,15 @@ function collapseRowSelection() {
 document.addEventListener(
   "pointerdown",
   (e) => {
+    if (e.target instanceof Element && !e.target.closest("#mobile-delete")) {
+      $("mobile-delete").dataset.armed = "";
+      $("mobile-delete").textContent = "Delete";
+      $("mobile-delete").classList.remove("confirm-delete");
+    }
     if (
       !(e.target instanceof Element) ||
       e.target.closest(
-        "#sample-table, #program-ribbon button, .storagebar .custom-select, .storagebar select, .custom-options, dialog, #duplicate-sample, .remove-sample-button",
+        "#sample-table, #program-ribbon button, .storagebar .custom-select, .storagebar select, .custom-options, dialog, .samples-panel .toolbar, .remove-sample-button",
       )
     )
       return;
@@ -896,6 +937,15 @@ async function enable() {
   }
   status(`Audio ready · ${audio.context.sampleRate / 1000} kHz`);
 }
+// iOS can withhold audio activation until touch-end; never await startup first.
+document.addEventListener(
+  "touchend",
+  () => {
+    if (audio.context && audio.context.state !== "running")
+      void audio.context.resume().catch(report);
+  },
+  { capture: true, passive: true },
+);
 async function startNote(note, velocity = 127, channel = 0, previewId = null) {
   if (current().landing) return;
   if (channel > 0 && !["All", String(channel)].includes(current().channel))
@@ -1467,7 +1517,6 @@ listen("input-source", "change", (e) => {
   cancelLearning();
   stopTrim();
   state.source = e.target.value;
-  midiPreferenceRestored = true;
   touch();
   paint();
   changed();
@@ -1501,9 +1550,19 @@ function setRecordThreshold(value) {
   if (armed)
     audio.send({ type: "threshold", threshold: state.record.threshold });
 }
-let thresholdDragging = false;
+let thresholdDragging = false,
+  thresholdTouch = null;
 thresholdMeter.addEventListener("pointerdown", (e) => {
   if (e.button !== 0) return;
+  if (e.pointerType === "touch") {
+    thresholdTouch = {
+      id: e.pointerId,
+      x: e.clientX,
+      y: e.clientY,
+      moved: false,
+    };
+    return;
+  }
   e.preventDefault();
   thresholdMarker.focus({ preventScroll: true });
   thresholdDragging = true;
@@ -1511,10 +1570,31 @@ thresholdMeter.addEventListener("pointerdown", (e) => {
   dragThreshold(e);
 });
 thresholdMeter.addEventListener("pointermove", (e) => {
+  if (thresholdTouch?.id === e.pointerId && !thresholdDragging) {
+    const dx = Math.abs(e.clientX - thresholdTouch.x),
+      dy = Math.abs(e.clientY - thresholdTouch.y);
+    if (Math.max(dx, dy) < 8) return;
+    thresholdTouch.moved = true;
+    if (dy >= dx) {
+      thresholdTouch = null;
+      return;
+    }
+    thresholdDragging = true;
+    thresholdMeter.setPointerCapture(e.pointerId);
+  }
   if (thresholdDragging) dragThreshold(e);
 });
-for (const type of ["pointerup", "pointercancel", "lostpointercapture"])
-  thresholdMeter.addEventListener(type, () => (thresholdDragging = false));
+thresholdMeter.addEventListener("pointerup", (e) => {
+  if (thresholdTouch?.id === e.pointerId && !thresholdTouch.moved)
+    dragThreshold(e);
+  thresholdDragging = false;
+  thresholdTouch = null;
+});
+for (const type of ["pointercancel", "lostpointercapture"])
+  thresholdMeter.addEventListener(type, () => {
+    thresholdDragging = false;
+    thresholdTouch = null;
+  });
 function dragThreshold(e) {
   const r = thresholdMeter.getBoundingClientRect();
   setRecordThreshold(positionDb((e.clientX - r.left) / r.width));
@@ -1577,18 +1657,6 @@ const ui = new ClassicUI({
   rowSelect,
   selectedIds,
   selectionMode: () => rowSelection.mode,
-  enterSelection: (id) => {
-    const p = current();
-    rowSelection.reconcile(p);
-    rowSelection.enter(id);
-    p.selected = id;
-    stopTrim();
-    if (learn) cancelLearning();
-    paint();
-    status(
-      "Selection mode: tap rows to toggle; use handles to drag, play to audition, or tap outside to finish.",
-    );
-  },
   auditioning: (id) => auditions.has(id),
   previewSample: (id) => safe(previewSample(id)),
   paint,
@@ -1715,7 +1783,7 @@ async function newSample() {
   changed();
   await audio.syncProgram(p);
 }
-listen("duplicate-sample", "click", async () => {
+async function duplicateSelectedRows() {
   const p = current(),
     ids = selectedIds();
   const sources = p.samples.filter((s) => ids.has(s.id));
@@ -1734,15 +1802,43 @@ listen("duplicate-sample", "click", async () => {
   }));
   p.samples.push(...copies);
   p.selected = copies[0].id;
-  const selectionMode = rowSelection.mode;
+  const selectionMode = rowSelection.mode,
+    explicitMode = rowSelection.explicitMode;
   rowSelection.select(p.selected);
   rowSelection.mode = selectionMode;
+  rowSelection.explicitMode = explicitMode;
   rowSelection.ids = new Set(copies.map((s) => s.id));
   for (const copy of copies) checkpoint(copy);
   touch(p);
   paint();
   changed();
   await audio.syncProgram(p);
+}
+listen("duplicate-sample", "click", duplicateSelectedRows);
+listen("mobile-select", "click", () => {
+  if (rowSelection.mode) rowSelection.select(current().selected);
+  else {
+    rowSelection.reconcile(current());
+    rowSelection.enter(current().selected, true);
+  }
+  paint();
+});
+listen("mobile-copy", "click", () =>
+  copySelectedRows(false, current().id, new Set(selectedIds())),
+);
+listen("mobile-paste", "click", () => pasteSelectedRows(current().id));
+listen("mobile-delete", "click", () => {
+  const button = $("mobile-delete");
+  const signature = JSON.stringify([...selectedIds()].sort());
+  if (button.dataset.armed === signature) {
+    button.dataset.armed = "false";
+    button.textContent = "Delete";
+    button.classList.remove("confirm-delete");
+    return deleteRows(new Set(selectedIds()), false);
+  }
+  button.dataset.armed = signature;
+  button.textContent = "Sure?";
+  button.classList.add("confirm-delete");
 });
 
 async function deleteRows(ids, ask = true) {
@@ -1753,6 +1849,7 @@ async function deleteRows(ids, ask = true) {
       !(await discardGuard(`Remove ${ids.size} selected samples?`, p.dirty)))
   )
     return;
+  const explicitMode = rowSelection.explicitMode;
   const previousSelected = p.selected;
   const index = p.samples.findIndex((s) => ids.has(s.id));
   p.samples = p.samples.filter((s) => !ids.has(s.id));
@@ -1764,6 +1861,10 @@ async function deleteRows(ids, ask = true) {
     ? previousSelected
     : (p.samples[Math.min(index, p.samples.length - 1)]?.id ?? null);
   rowSelection.select(p.selected);
+  if (explicitMode) {
+    rowSelection.mode = true;
+    rowSelection.explicitMode = true;
+  }
   touch(p);
   paint();
   changed();
@@ -2887,17 +2988,23 @@ document.addEventListener("drop", (e) => {
 });
 // MIDI follows device hotplug, channel filtering and velocity-zero note-off convention.
 let midi = null;
-let midiRoutingRequested = false;
+let midiPermission = "prompt";
+let midiConnection = null;
 function refreshMidi() {
   const inputs = [...(midi?.inputs.values() ?? [])].filter(
     (input) => input.state !== "disconnected",
   );
   const connected = inputs.length > 0;
-  $("input-routing-label").hidden = !connected && !midiRoutingRequested;
+  $("input-routing-label").hidden = false;
   $("midi-channel-label").hidden =
     !connected ||
     ["None", "PC Keyboard"].includes(state.source ?? "PC Keyboard");
-  $("connect-midi").hidden = connected;
+  $("connect-midi").hidden =
+    !navigator.requestMIDIAccess ||
+    Boolean(midi) ||
+    midiPermission === "granted";
+  $("connect-midi").textContent =
+    midiPermission === "denied" ? "Allow MIDI" : "Connect MIDI";
   const value = state.source ?? "PC Keyboard";
   $("input-source").replaceChildren(
     option("PC Keyboard"),
@@ -2927,69 +3034,75 @@ function refreshMidi() {
   if (![...$("input-source").options].some((o) => o.value === value))
     $("input-source").append(option(value, "Saved MIDI input (disconnected)"));
   $("input-source").value = value;
-  $("midi-status").textContent = connected ? "" : "No external MIDI device";
+  $("midi-status").textContent = "";
   syncControls();
 }
-listen("connect-midi", "click", async () => {
-  if (!navigator.requestMIDIAccess)
+async function connectMidi(interactive = false) {
+  if (midiConnection) return midiConnection;
+  if (!navigator.requestMIDIAccess) return;
+  if (interactive && midiPermission === "denied") {
     throw Error(
-      "Native MIDI is unavailable here. Use Chrome/Edge on macOS or Windows, or play with touch/keyboard.",
-    );
-  // An explicit connect action also exposes PC Keyboard/None without hardware.
-  // Keep the saved routing choice until the user changes it.
-  midiRoutingRequested = true;
-  refreshMidi();
-  // Local input choices do not depend on granting external MIDI permission.
-  // Request access directly in the click gesture, independently of audio startup.
-  try {
-    midi = await navigator.requestMIDIAccess({ sysex: false });
-  } catch (error) {
-    throw Error(
-      error?.name === "NotAllowedError" || error?.name === "SecurityError"
-        ? "MIDI permission was denied. Allow MIDI in the browser site settings, then reconnect."
-        : `MIDI connection failed: ${error?.message || "unknown browser error"}`,
+      "MIDI is blocked. Open Chrome site settings, allow MIDI devices, then return here. PC Keyboard works without MIDI permission.",
     );
   }
-  midi.onstatechange = () => {
-    stopAll();
-    refreshMidi();
-  };
-  refreshMidi();
-  if (
-    ![...midi.inputs.values()].some((input) => input.state !== "disconnected")
-  ) {
-    const message =
-      state.source === "PC Keyboard"
-        ? "PC Keyboard is ready. No external MIDI device is connected."
-        : "No external MIDI device is connected. Choose PC Keyboard in Input to play with your computer keys.";
-    status(message);
-    $("toast").textContent = message;
-    $("toast").hidden = false;
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => ($("toast").hidden = true), 8000);
-  }
-  // MIDI discovery remains usable even when audio cannot start yet.
-  void enable().catch(report);
-  if (!midiPreferenceRestored && state.source === "PC Keyboard") {
-    const preferred =
-      [...midi.inputs.values()].find((input) => input.state !== "disconnected")
-        ?.id ?? "PC Keyboard";
-    if (preferred !== state.source) {
-      state.source = preferred;
-      touch();
+  midiConnection = (async () => {
+    try {
+      const request = navigator.requestMIDIAccess({ sysex: false });
+      if (interactive) void enable().catch(report);
+      const access = await request;
+      midi = access;
+      midiPermission = "granted";
+      midi.onstatechange = () => {
+        stopAll();
+        refreshMidi();
+      };
+      // Discovery never changes the selected note source.
+      refreshMidi();
+    } catch (error) {
+      if (["NotAllowedError", "SecurityError"].includes(error?.name))
+        midiPermission = "denied";
+      refreshMidi();
+      throw Error(
+        midiPermission === "denied"
+          ? "MIDI permission was denied. Allow MIDI in Chrome site settings. PC Keyboard remains available in Input."
+          : `MIDI connection failed: ${error?.message || "unknown browser error"}`,
+      );
+    } finally {
+      midiConnection = null;
     }
-  }
-  paint();
-  changed();
-});
-listen("midi-source", "change", stopAll);
-if (!navigator.requestMIDIAccess) {
-  $("connect-midi").disabled = true;
-
-  $("connect-midi").title =
-    "Native MIDI is unavailable in this browser. Use Chrome/Edge on macOS or Windows, or play with touch/keyboard.";
-  $("midi-status").textContent = "MIDI unavailable";
+  })();
+  return midiConnection;
 }
+listen("connect-midi", "click", () => connectMidi(true));
+listen("midi-source", "change", stopAll);
+async function initializeMidi() {
+  refreshMidi();
+  if (!navigator.requestMIDIAccess) return;
+  try {
+    const permission = await navigator.permissions.query({
+      name: "midi",
+      sysex: false,
+    });
+    const update = () => {
+      midiPermission = permission.state;
+      if (permission.state !== "granted" && midi) {
+        for (const input of midi.inputs.values()) input.onmidimessage = null;
+        midi.onstatechange = null;
+        midi = null;
+        stopAll();
+      }
+      refreshMidi();
+      if (permission.state === "granted") void connectMidi().catch(report);
+    };
+    permission.onchange = update;
+    update();
+  } catch {
+    // Older browsers may expose Web MIDI without its Permissions descriptor.
+    midiPermission = "prompt";
+    refreshMidi();
+  }
+}
+void initializeMidi();
 // Computer keyboard: do not capture typing or command shortcuts.
 const keyMap = {
   a: 0,
@@ -3020,6 +3133,17 @@ document.addEventListener(
   "keydown",
   (e) => {
     const key = e.key.toLowerCase();
+    if (
+      ui.phonePiano &&
+      !ui.externalKeyboardSeen &&
+      e.isTrusted &&
+      !editing(e.target) &&
+      !e.isComposing &&
+      e.key !== "Unidentified"
+    ) {
+      ui.externalKeyboardSeen = true;
+      paint();
+    }
     if (current().landing && !document.querySelector("dialog[open]")) return;
     if (
       (e.metaKey || e.ctrlKey) &&
@@ -3119,6 +3243,18 @@ document.addEventListener(
           )
           .catch(report);
       }
+      return;
+    }
+    if (
+      (e.metaKey || e.ctrlKey) &&
+      !e.altKey &&
+      key === "d" &&
+      !editing(e.target) &&
+      !document.querySelector("dialog[open]")
+    ) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (!e.repeat) void duplicateSelectedRows().catch(report);
       return;
     }
     if ((e.metaKey || e.ctrlKey) && key === "s" && !editing(e.target)) {
@@ -3497,6 +3633,13 @@ function updateRecordButtons() {
   $("record-open").classList.toggle("active", locked);
   syncControls();
 }
+listen("takes-select", "click", () => {
+  if (takeTable.selection.mode) takeTable.collapse();
+  else {
+    takeTable.selection.enter(takeTable.primary, true);
+    takeTable.render();
+  }
+});
 async function beginRecord(arm) {
   if (recording || armed || finishingRecording)
     throw Error("Wait for the current recording to finish.");
@@ -4486,6 +4629,9 @@ window.addEventListener("sampler-before-update", (event) => {
   );
 });
 
+listen("keyboard-mode", "click", () =>
+  ui.setPianoTouchMode(ui.pianoTouchMode === "play" ? "move" : "play"),
+);
 listen("keyboard-fold", "click", () => {
   for (const id of [...pointerNotes.keys()]) releasePointer(id);
   ui.setKeyboardCollapsed(
@@ -4542,4 +4688,13 @@ listen("settings-piano", "change", () => {
   ui.setKeyboardCollapsed(!$("settings-piano").checked);
   ui.queueViewChanged();
   updateLearningDock();
+});
+
+// Safari has no keyboard-attachment event. Re-detect typing use after leaving the app.
+window.addEventListener("pagehide", () => {
+  if (ui.phonePiano) ui.externalKeyboardSeen = false;
+});
+
+window.addEventListener("pageshow", () => {
+  if (ui.phonePiano) paintKeyboard();
 });

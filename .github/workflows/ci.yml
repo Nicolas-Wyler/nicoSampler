@@ -33,3 +33,6 @@ jobs:
       - run: npm run test:browser
       - run: npm run test:recorder
       - run: npm run test:auto-assign
+      - run: npm run test:phone
+      - run: npm run test:touch
+      - run: npm run test:piano

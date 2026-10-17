@@ -117,6 +117,133 @@ function enhanceSelect(select) {
   select.addEventListener("change", syncControls);
   selects.set(select, button);
 }
+/** A touch must remain still before a parameter drag can claim scrolling. */
+export function installTouchHold(element, { start, move, end, tap } = {}) {
+  let gesture = null,
+    tapPending = false;
+  // Open touch menus from the compatibility click itself, so a later click
+  // cannot be retargeted to a newly opened dialog's Close button.
+  element.addEventListener("click", (event) => {
+    if (!tapPending) return;
+    tapPending = false;
+    event.preventDefault();
+    event.stopPropagation();
+    tap?.(event);
+  });
+  const finish = (event, cancelled = false) => {
+    if (!gesture || event.pointerId !== gesture.id) return;
+    const current = gesture;
+    gesture = null;
+    clearTimeout(current.timer);
+    element.classList.remove("touch-adjusting");
+    if (current.active) {
+      event.preventDefault();
+      end?.(event, cancelled);
+    } else if (!cancelled && !current.scrolling && tap) tapPending = true;
+  };
+  element.addEventListener("pointerdown", (event) => {
+    if (event.pointerType !== "touch" || event.button !== 0 || !event.isPrimary)
+      return;
+    tapPending = false;
+    gesture = {
+      id: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      active: false,
+      scrolling: false,
+    };
+    const current = gesture;
+    current.timer = setTimeout(() => {
+      if (gesture !== current || current.scrolling) return;
+      current.active = true;
+      element.classList.add("touch-adjusting");
+      element.setPointerCapture(current.id);
+      start?.(event);
+    }, 350);
+  });
+  element.addEventListener("pointermove", (event) => {
+    if (!gesture || gesture.id !== event.pointerId) return;
+    if (gesture.active) move?.(event);
+    else if (
+      Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 8
+    ) {
+      clearTimeout(gesture.timer);
+      gesture.scrolling = true;
+    }
+  });
+  element.addEventListener(
+    "touchmove",
+    (event) => {
+      if (gesture?.active) event.preventDefault();
+    },
+    { passive: false },
+  );
+  element.addEventListener("pointerup", (event) => finish(event));
+  for (const type of ["pointercancel", "lostpointercapture"])
+    element.addEventListener(type, (event) => finish(event, true));
+}
+const touchRanges = new WeakSet();
+function enhanceTouchRange(input) {
+  if (touchRanges.has(input)) return;
+  touchRanges.add(input);
+  let drag;
+  const change = (value, final = false) => {
+    const min = Number(input.min) || 0,
+      max = Number(input.max) || 100,
+      step = Number(input.step) || 1;
+    input.value = String(
+      Math.max(min, Math.min(max, Math.round(value / step) * step)),
+    );
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    if (final) input.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+  input.addEventListener("pointerdown", (e) => {
+    if (e.pointerType !== "touch" || input.disabled) return;
+    e.preventDefault();
+    drag = {
+      id: e.pointerId,
+      x: e.clientX,
+      y: e.clientY,
+      value: Number(input.value),
+      active: false,
+    };
+  });
+  input.addEventListener("pointermove", (e) => {
+    if (drag?.id !== e.pointerId) return;
+    const dx = e.clientX - drag.x,
+      dy = e.clientY - drag.y;
+    if (!drag.active) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 8) return;
+      if (Math.abs(dy) >= Math.abs(dx)) {
+        drag = null;
+        return;
+      }
+      drag.active = true;
+      input.setPointerCapture(e.pointerId);
+    }
+    change(
+      drag.value +
+        (dx / Math.max(1, input.getBoundingClientRect().width)) *
+          (Number(input.max) - Number(input.min)),
+    );
+  });
+  input.addEventListener("pointerup", (e) => {
+    if (drag?.id !== e.pointerId) return;
+    if (!drag.active) {
+      const r = input.getBoundingClientRect();
+      change(
+        Number(input.min) +
+          ((e.clientX - r.left) / r.width) *
+            (Number(input.max) - Number(input.min)),
+        true,
+      );
+    } else change(Number(input.value), true);
+    drag = null;
+  });
+  input.addEventListener("pointercancel", () => {
+    drag = null;
+  });
+}
 function enhanceRotary(input) {
   if (rotaries.has(input)) return;
   const button = document.createElement("button");
@@ -142,7 +269,7 @@ function enhanceRotary(input) {
     syncControls();
   }
   button.addEventListener("pointerdown", (e) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0 || e.pointerType === "touch") return;
     e.preventDefault();
     button.focus();
     button.setPointerCapture(e.pointerId);
@@ -158,6 +285,21 @@ function enhanceRotary(input) {
     button.addEventListener("pointermove", move);
     button.addEventListener("pointerup", done);
     button.addEventListener("pointercancel", done);
+  });
+  let touchDrag;
+  installTouchHold(button, {
+    start: (e) => {
+      touchDrag = { y: e.clientY, value: Number(input.value), moved: false };
+    },
+    move: (e) => {
+      if (!touchDrag || Math.abs(e.clientY - touchDrag.y) < 4) return;
+      touchDrag.moved = true;
+      set(touchDrag.value + ((touchDrag.y - e.clientY) * (max - min)) / 160);
+    },
+    end: () => {
+      if (touchDrag?.moved) set(Number(input.value), true);
+      touchDrag = null;
+    },
   });
   button.addEventListener("keydown", (e) => {
     if (
@@ -291,7 +433,9 @@ function syncScrollbars() {
     }
     const coarse = matchMedia("(pointer: coarse)").matches;
     const thickness = ((coarse ? 10 : 8) * 2) / 3;
-    const hasX = element.scrollWidth > element.clientWidth + 1;
+    const hasX =
+      element.dataset.navigationLocked !== "true" &&
+      element.scrollWidth > element.clientWidth + 1;
     const hasY = element.scrollHeight > element.clientHeight + 1;
     // The table owns its right lane; ordinary scrollers reserve padding for tracks.
     if (element.id !== "program-ribbon") {
@@ -416,6 +560,9 @@ export function initControls() {
     document.querySelectorAll("select").forEach(enhanceSelect);
     document.querySelectorAll("dialog").forEach(enhanceScroll);
     document.querySelectorAll("[data-rotary]").forEach(enhanceRotary);
+    document
+      .querySelectorAll("input[type=range]:not([data-rotary]):not([hidden])")
+      .forEach(enhanceTouchRange);
     syncControls();
   };
   enhance();

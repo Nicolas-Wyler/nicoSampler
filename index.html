@@ -163,7 +163,11 @@
           <span id="memory-info" class="subtle"></span>
         </div>
         <div class="toolbar">
-          <button id="duplicate-sample">Duplicate</button
+          <button id="mobile-select" hidden>Select</button
+          ><button id="mobile-copy" hidden>Copy</button
+          ><button id="mobile-paste" hidden>Paste</button
+          ><button id="mobile-delete" hidden>Delete</button
+          ><button id="duplicate-sample" hidden>Duplicate</button
           ><button id="fx-open">FX</button
           ><button id="spread-open">Spread</button
           ><button id="record-open">Record</button
@@ -184,6 +188,17 @@
         aria-label="Onscreen keyboard always available"
       >
         <div class="statusline octavebar">
+          <span
+            class="piano-resize-handle"
+            role="separator"
+            tabindex="0"
+            aria-orientation="horizontal"
+            aria-label="Resize piano height"
+            aria-valuemin="90"
+            aria-valuenow="132"
+            ><svg viewBox="0 0 20 20" aria-hidden="true">
+              <path d="M4 6h12M4 10h12M4 14h12" /></svg
+          ></span>
           <div class="piano-info">
             <span id="status" role="status" aria-live="polite"
               >Load a sample, then assign its MIDI key. Default playback:
@@ -199,6 +214,15 @@
             ><button id="octave-up">Octave →</button>
           </div>
           <button
+            id="keyboard-mode"
+            type="button"
+            hidden
+            aria-label="Piano touch mode"
+            title="Switch piano to Move mode"
+          >
+            Play
+          </button>
+          <button
             id="keyboard-fold"
             type="button"
             aria-label="Fold piano"
@@ -207,6 +231,17 @@
           >
             ⌄
           </button>
+          <span
+            class="piano-resize-handle"
+            role="separator"
+            tabindex="0"
+            aria-orientation="horizontal"
+            aria-label="Resize piano height"
+            aria-valuemin="90"
+            aria-valuenow="132"
+            ><svg viewBox="0 0 20 20" aria-hidden="true">
+              <path d="M4 6h12M4 10h12M4 14h12" /></svg
+          ></span>
         </div>
         <div id="keyboard-scroll">
           <div id="keyboard" role="group" aria-label="Full MIDI piano"></div>
@@ -816,7 +851,10 @@
         ><button id="record-arm" disabled="">Arm</button
         ><button id="record-stop" hidden disabled="">Stop</button>
       </div>
-      <h3>Recorded takes</h3>
+      <div class="panel-heading">
+        <h3>Recorded takes</h3>
+        <button id="takes-select" hidden>Select</button>
+      </div>
       <div id="recorded-takes-wrap">
         <table id="recorded-takes-table" aria-label="Recorded takes">
           <thead>
