@@ -4067,7 +4067,18 @@ async function boot() {
   // Project launchers can open the browser sampler with a same-origin or
   // localhost URL to a native .sampler.zip bundle.  This keeps conversion and
   // playback in the GitHub sampler format; the helper only serves the bundle.
-  const launchUrl = new URLSearchParams(location.search).get("projectUrl");
+  let launchUrl = new URLSearchParams(location.search).get("projectUrl");
+  // Chrome app-mode shortcuts keep their fixed manifest URL and discard
+  // arguments passed to `open -a`. The desktop launcher therefore publishes
+  // the selected project through its localhost helper instead.
+  if (!launchUrl) {
+    try {
+      const probe = await fetch("http://127.0.0.1:8770/launch.json", {
+        cache: "no-store",
+      });
+      if (probe.ok) launchUrl = (await probe.json()).project || null;
+    } catch {}
+  }
   let launchedProject = false;
   if (launchUrl) {
     try {
