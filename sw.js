@@ -1,5 +1,5 @@
-const VERSION = "2.0.30";
-const CACHE = "nicosampler-2.0.30-launchbridge";
+const VERSION = "0.2.30";
+const CACHE = "nicosampler-0.2.30-launchbridge";
 const ASSETS = [
   "./",
   "./index.html",

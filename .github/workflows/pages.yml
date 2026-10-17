@@ -29,10 +29,13 @@ jobs:
           cache-dependency-path: tools/launcher/go.mod
       - run: sh scripts/build-launchers.sh
       - run: npm run build:release
+        env:
+          SAMPLER_BUILD_VERSION: 0.2.30
       - name: Archive this numbered build as a release
         run: node scripts/publish-release.mjs
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          SAMPLER_BUILD_VERSION: 0.2.30
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist/web
