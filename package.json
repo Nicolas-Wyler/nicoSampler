@@ -22,7 +22,8 @@
     "test:launcher": "node scripts/test-launcher.mjs",
     "test:phone": "node scripts/test-phone-audio.mjs",
     "test:touch": "node scripts/test-touch-controls.mjs",
-    "test:piano": "node scripts/test-phone-piano.mjs"
+    "test:piano": "node scripts/test-phone-piano.mjs",
+    "test:updater": "node scripts/test-phone-updater.mjs"
   },
   "devDependencies": {
     "playwright": "1.62.1"

@@ -37,6 +37,7 @@ jobs:
       - run: npm run test:recorder
       - run: npm run test:auto-assign
       - run: npm run test:phone
+      - run: npm run test:updater
       - name: Mac piano gestures (verified locally on Mac)
         if: runner.os == 'macOS'
         run: npm run test:piano

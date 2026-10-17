@@ -26,6 +26,8 @@ new MutationObserver(placeButton).observe(document.getElementById("sampler"), {
   attributes: true,
   attributeFilter: ["hidden"],
 });
+const refreshIcon =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 5v6h-6M20 11a8 8 0 1 0-1.8 6.1"/></svg>';
 function show(text, enabled = false, action = "none") {
   button.dataset.action = action;
   button.title = action === "check" ? "Check for updates" : text;
@@ -37,6 +39,7 @@ function show(text, enabled = false, action = "none") {
   button.hidden = false;
   button.disabled = !enabled;
   button.textContent = text;
+  if (action === "check") button.innerHTML = refreshIcon;
 }
 function rpc(worker, message, progress) {
   return new Promise((resolve, reject) => {
@@ -85,8 +88,7 @@ async function checkUpdates() {
   clearTimeout(hideTimer);
   button.hidden = false;
   button.disabled = true;
-  button.innerHTML =
-    '<span class="update-spinner" aria-hidden="true">◌</span> Checking…';
+  button.innerHTML = `<span class="update-spinner" aria-hidden="true">${refreshIcon}</span> Checking…`;
   try {
     const local = await rpc(registration.active, { type: "OFFLINE_STATUS" });
     const response = await fetch(workerURL, { cache: "no-store" });

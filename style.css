@@ -2172,3 +2172,21 @@ textarea,
     --piano-height: 112.5px;
   }
 }
+
+/* Keep the idle updater legible on phone screens while retaining a compact icon. */
+#app-update[data-action="check"] {
+  opacity: 0.85;
+  width: 28px;
+  min-width: 28px;
+  color: var(--accent);
+}
+#app-update svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: middle;
+}
