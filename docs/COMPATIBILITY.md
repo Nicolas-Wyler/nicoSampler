@@ -8,7 +8,9 @@ The application is a standard browser app/PWA, not a Chrome extension or Chrome-
 | WebKit | Automated actual-browser playback, recording fixtures, save/import, offline cache and UI tests | Playwright WebKit is engine coverage, not a physical iPhone or shipping Safari certification |
 | Firefox | Actual-browser core playback, file/ZIP, editor keyboard, recording fixtures and offline checks | Browser-specific MIDI, screen capture and installation remain capability-dependent |
 | macOS ARM portable launcher | Native execution, HTTP/WASM, service worker offline reload, controlled stop and security tests | Unsigned/not notarized |
-| Intel macOS / Windows x64 / Windows ARM64 launchers | Cross-built binaries, architecture inspection and common server tests | Not executed on each target's physical hardware |
+| Intel macOS launcher | Cross-built binary, architecture inspection and common server tests | Not executed on physical Intel hardware |
+
+Windows/Linux releases are paused; previous downloads and source remain available.
 
 All third-party runtime assets are bundled; there are no CDNs or analytics. Initial hosted loading requires a network connection. The service worker makes cached application assets available offline after installation; permission and device access remain browser controlled.
 

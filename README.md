@@ -7,7 +7,7 @@ A source-available sampler that runs in your browser. Audio processing uses a C+
 ## Start
 
 - **Hosted PWA:** open the [hosted sampler](https://nicolas-wyler.github.io/nicoSampler/). Let the first load finish online. You can then use it offline in that browser; installing it as a PWA is optional and browser dependent.
-- **Portable download:** extract the complete macOS or Windows release ZIP, then double-click `Start.command` or `Start.cmd`. A bundled server opens your default browser on localhost. No administrator installation or separate runtime is needed. Keep its terminal window open.
+- **Portable download:** extract the complete macOS release ZIP, then double-click `Start.command`. A bundled server opens your default browser on localhost. No administrator installation or separate runtime is needed. Keep its terminal window open.
 - **Developer preview:** install Node.js 22 or newer and run `npm run serve`, then open <http://127.0.0.1:8770/>.
 
 An unpacked HTML file opened with `file://` is not a supported launch method. Portable binaries are unsigned; the OS may ask you to approve the download. Browser microphone, MIDI, and screen-sharing permission prompts remain under your control.

@@ -56,3 +56,5 @@ Every local release build also generates ignored `artifacts/iphone-preview/Start
 `npm run test:recorder` exercises synthetic captured audio, audible monitoring, take-table selection/playback, rename/delete, recovery and MIDI routing in Chrome/WebKit. `npm run test:auto-assign` covers multi-file imports and collision-free key assignment in both engines. These tests use generated fixtures, not user recordings.
 
 `npm run test:phone` checks touch WebKit audio output, phone zoom bounds, explicit selection/clipboard and text-edit exceptions. `npm run test:touch` checks held parameter editing versus immediate scrolling using Chromium touch events. Neither replaces physical iOS testing.
+
+Current platform scope: macOS and iPhone/iPad. Windows/Linux releases and platform-specific investigations are paused until explicitly requested. Existing source and old releases are retained. Native touch/piano gesture scripts are validated locally on Mac; shared core/browser CI and hosted deployment still use Linux infrastructure.

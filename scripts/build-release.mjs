@@ -167,7 +167,6 @@ await archive(
 if (!process.argv.includes("--web-only"))
   for (const [label, systems, wrapper] of [
     ["macOS", ["darwin-arm64", "darwin-amd64"], "Start.command"],
-    ["Windows", ["windows-amd64", "windows-arm64"], "Start.cmd"],
   ]) {
     const bins = [];
     for (const system of systems) {

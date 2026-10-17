@@ -9,7 +9,7 @@ if ! command -v "$LAUNCHER_GO" >/dev/null 2>&1; then
 fi
 cd "$RELEASE_ROOT/tools/launcher"
 GOTOOLCHAIN=local "$LAUNCHER_GO" test ./...
-for LAUNCHER_TARGET in darwin/arm64 darwin/amd64 windows/amd64 windows/arm64; do
+for LAUNCHER_TARGET in darwin/arm64 darwin/amd64; do
   LAUNCHER_OS=${LAUNCHER_TARGET%/*}
   LAUNCHER_ARCH=${LAUNCHER_TARGET#*/}
   LAUNCHER_OUT="$RELEASE_ROOT/portable/bin/$LAUNCHER_OS-$LAUNCHER_ARCH"

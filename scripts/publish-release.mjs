@@ -45,7 +45,7 @@ else if (existing.status === 404)
       target_commitish: commit,
       name: `nicoSampler ${manifest.version}`,
       prerelease: true,
-      body: `Version ${manifest.version}\n\nSource commit: ${commit}\n\nBuilt browser app, portable macOS/Windows apps, examples, documentation and source. SHA256SUMS.txt verifies the downloads. License terms are included. Each build is archived separately for rollback.`,
+      body: `Version ${manifest.version}\n\nSource commit: ${commit}\n\nBuilt browser app, portable macOS apps, examples, documentation and source. SHA256SUMS.txt verifies the downloads. License terms are included. Each build is archived separately for rollback.`,
     }),
   });
 else throw Error(`Cannot inspect release: ${existing.status}`);
