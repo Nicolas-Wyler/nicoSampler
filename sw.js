@@ -11,6 +11,8 @@ const ASSETS = [
   "./src/app.js",
   "./src/offline-install.js",
   "./src/version.js",
+  "./src/recorded-takes.js",
+  "./src/auto-assignment.js",
   "./src/example-kit.js",
   "./src/master-knob.js",
   "./src/input-monitor.js",

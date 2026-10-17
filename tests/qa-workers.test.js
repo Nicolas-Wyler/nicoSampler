@@ -21,3 +21,5 @@ test('threshold trigger and meter use the selected recording channels',async()=>
   const meter=messages.filter(m=>m.type==='meter').at(-1);assert.ok(meter,mode);assert.ok(Math.abs(meter.inputPeak-peak)<1e-6,mode);
  }
 });
+
+test('worklet honors the available-storage recording duration cap',async()=>{const {p,messages,process}=await worklet();p.message({type:'record',mode:'Stereo',threshold:-20,arm:false,maxSeconds:.01});for(let n=0;n<5;n++)process(new Float32Array(128).fill(.2));const done=messages.find(m=>m.type==='recordDone');assert.equal(done.frames,480);assert.equal(done.limited,true);assert.equal(p.recording,false);});

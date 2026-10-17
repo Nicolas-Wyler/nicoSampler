@@ -416,7 +416,12 @@ export function initControls() {
     syncControls();
   };
   enhance();
-  ["table-wrap", "program-ribbon", "keyboard-scroll"].forEach((id) => {
+  [
+    "table-wrap",
+    "program-ribbon",
+    "keyboard-scroll",
+    "recorded-takes-wrap",
+  ].forEach((id) => {
     const element = document.getElementById(id);
     if (element) enhanceScroll(element);
   });

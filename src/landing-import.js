@@ -11,7 +11,8 @@ export async function planLandingImport(files) {
     if (/\.nicosbank$/i.test(file.name)) kind = "bank";
     else if (/\.nicoprog$/i.test(file.name)) kind = "program";
     else if (/\.nicosample$/i.test(file.name)) kind = "sample";
-    else if (/\.wav$/i.test(file.name)) kind = "wave";
+    else if (/\.(wav|mp3|m4a|aac|aif|aiff|flac|ogg|opus|wma)$/i.test(file.name))
+      kind = "wave";
     else if (/\.(json|zip)$/i.test(file.name)) {
       try {
         let text;
@@ -71,7 +72,9 @@ export async function planLandingImport(files) {
   if (!accepted.length)
     throw (
       entries.find((e) => e.error)?.error ??
-      Error("No supported bank, program, sample container or WAV files found.")
+      Error(
+        "No supported bank, program, sample container or supported audio files found.",
+      )
     );
   if (kind === "bank" && accepted.length > 1)
     throw Error(

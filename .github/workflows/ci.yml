@@ -31,3 +31,5 @@ jobs:
           pactl load-module module-null-sink sink_name=nicosampler_test
           pactl set-default-sink nicosampler_test
       - run: npm run test:browser
+      - run: npm run test:recorder
+      - run: npm run test:auto-assign

@@ -48,7 +48,7 @@ Bitcrushing is non-destructive: its rate/bits are audible processing parameters,
 
 ## Input monitoring and recording
 
-The top In meter defaults to gray with **Click to activate** over it. Click to connect the selected recording source/device. When active, hover or keyboard focus highlights it and shows **Deactivate?**; click to disconnect. Listening is not speaker monitoring: the input is not fed to your speakers. The Record dialog reuses an active connection, and closing it preserves explicit header monitoring.
+The top In meter defaults to gray with **Click to activate** over it. Click to connect the selected recording source/device. When active, hover or keyboard focus highlights it and shows **Deactivate?**; click to disconnect. This header control activates input capture and metering. Audible monitoring is a separate **Monitor** checkbox beside Input in Record, off by default. The Record dialog reuses an active connection, and closing it preserves explicit header monitoring.
 
 If reported base/output latency rises beyond both 5 ms and 50% of its settled baseline for three consecutive 500 ms checks, monitoring stops and a notice explains why. Any active take is stopped and processed before disconnecting. The baseline settles for two seconds; unknown readings do not cause a guess. This is browser-reported latency, not a measured hardware round trip. Base latency has a persistent status label, showing unavailable when the browser has no reading.
 
@@ -58,7 +58,7 @@ Open Record from a selected row. Source and Device share a row; Channels, Sample
 
 The default recording format is 44.1 kHz/16-bit. Rates include 8, 11.025, 22.05, 32, 44.1, 48 and 96 kHz; depths include 8, 12, 16 and 24-bit PCM plus 32-bit float. A 12-bit WAV uses 12 valid PCM bits in 16-bit storage. Recorded takes retain their chosen WAV format even though playback uses the sampler's internal audio cache. Recordings have a three-minute limit; loaded samples have a ten-minute limit. Memory/voice limits are described in the developer guide.
 
-Completed takes live in the browser-local Recorded takes library. Reopen Record to choose, preview, use/replace, export or discard an older take. Choosing no take hides its actions. Export WAV downloads a file; browser recovery does not silently write audio into an OS folder. Save Bank includes detached takes as well as program audio.
+Completed takes remain in the browser-local **Recorded takes** table, including after using one in the sampler. Click a name to rename it; Length, Rate (kHz), and Bits describe the stored take. Command/Ctrl-click, Shift-click, or long-press selects multiple takes. Row Play toggles playback for the selected group; **Use Recordings** adds them as new sample rows. Each trash icon becomes **Sure?** on the first click and deletes that take on the second. Escape collapses a group selection before closing Record. There are no recorder clipboard shortcuts. Save Bank includes detached takes as well as program audio; use the main Save menu to export samples after adding them.
 
 ## Saving and rendering
 
@@ -80,8 +80,16 @@ The update indicator sits left of the In/Out meters (top right on the landing pa
 
 Recording Gain sits beside the input meter and ranges from −24 to +24 dB. It affects the meter, threshold trigger and recorded audio equally, and is saved with recording preferences. New sessions default to 50% master volume; saved session/project levels are retained.
 
-Recording uses one **Input** menu for the default input, microphones/interfaces and **Share tab / system audio…**. The browser sharing picker determines available tab/screen audio and requires explicit permission. Device names are refreshed when the recorder opens and hardware changes. Opening Record activates the header input monitor; closing Record deactivates it unless it was already active beforehand. The ↻ control beside the meters can check for updates manually. Master, the app mark and source-memory usage remain visible in narrow windows; Master’s label sits above its knob without a visible percentage.
+Recording uses one **Input** menu for the default input, microphones/interfaces and **Share tab / system audio…**. The browser sharing picker determines available tab/screen audio and requires explicit permission. Device names are refreshed when the recorder opens and hardware changes. Opening Record activates the header input monitor; closing Record deactivates it unless it was already active beforehand. The ↻ control beside the meters can check for updates manually. Master, the app mark and source-memory usage remain visible in narrow windows; Master’s label sits below its knob without a visible percentage.
 
 ## Sampler settings
 
 Click the app icon at the top left to open Sampler settings. Master level, input routing, MIDI channel and piano visibility apply immediately. Close with the × button or Escape. These preferences are included in local recovery and bank/program saves.
+
+The main MIDI channel selector is hidden when Input is None or PC Keyboard. Recorded takes are captured only within the remaining source-audio storage budget; a recording may stop early when that limit is reached. Audible Monitor follows recording Gain and Master, resets off when the recorder closes, and does not change stored audio.
+
+## Assigning imported samples
+
+When two or more imported audio files or sample containers have no key assignment, the sampler asks whether to auto-assign them or keep them unassigned. Auto assignment chooses an ascending, collision-free block near the piano's visible center. With PC Keyboard input, the block stays inside the current playable keyboard range. If no block fits, free some keys/change octave or load unassigned. Container assignments are preserved and reserve their full spread ranges; existing-key collisions use the normal Override/Multi-assign/Cancel prompt. File-name order determines the rising key order. This applies to both the file picker and drops; browser-supported MP3 and other audio files can also be dropped on the landing screen/table.
+
+Sample and Level are pinned at the edges during horizontal scrolling, with opaque backgrounds and thin dividers around the scrollable columns.

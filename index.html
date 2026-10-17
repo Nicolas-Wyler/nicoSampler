@@ -23,7 +23,7 @@
     <section id="landing" aria-label="Start a program">
       <button id="landing-drop" aria-label="Import bank, programs or samples">
         <strong>Drop files here</strong>
-        <span>Bank · Programs · Sample containers · WAV</span>
+        <span>Bank · Programs · Sample containers · Audio</span>
         <span>or click to choose files</span>
       </button>
       <button id="landing-new">Empty project</button>
@@ -32,7 +32,7 @@
       <input
         id="landing-files"
         type="file"
-        accept=".zip,.nicosbank,.nicoprog,.nicosample,.wav,.json"
+        accept="audio/*,.zip,.nicosbank,.nicoprog,.nicosample,.wav,.mp3,.m4a,.aac,.aif,.aiff,.flac,.ogg,.opus,.json"
         multiple
         hidden
       />
@@ -726,7 +726,7 @@
         <button id="record-close" aria-label="Close recorder">✕</button>
       </div>
       <p class="hint">
-        Input is not sent to speakers. Up to 3 minutes per take.
+        Up to 3 minutes per take. Monitor sends the input to your audio output.
       </p>
       <select id="record-source" hidden aria-hidden="true">
         <option value="mic">Microphone / audio interface</option>
@@ -742,6 +742,9 @@
             <option value="">System default</option>
             <option value="__system_audio__">Share tab / system audio…</option>
           </select></label
+        >
+        <label class="record-audible-monitor"
+          ><input id="record-monitor" type="checkbox" /> Monitor</label
         >
       </div>
       <div class="fields record-format-row">
@@ -813,24 +816,23 @@
         ><button id="record-arm" disabled="">Arm</button
         ><button id="record-stop" hidden disabled="">Stop</button>
       </div>
-      <label class="field take-library"
-        >RECORDED TAKES
-        <select id="take-select">
-          <option value="">No recorded takes</option>
-        </select></label
-      >
-      <div id="take-actions" hidden="">
-        <p id="take-info"></p>
-        <div class="dialog-actions">
-          <button id="take-preview">▶ Preview</button
-          ><button id="take-use" class="primary">Use Recording</button
-          ><button id="take-replace">Replace selected</button
-          ><button id="take-export">Export WAV</button>
-        </div>
-        <button id="take-stop">Stop Playback</button
-        ><button id="record-retry">Retry</button
-        ><button id="take-discard">Discard take</button>
+      <h3>Recorded takes</h3>
+      <div id="recorded-takes-wrap">
+        <table id="recorded-takes-table" aria-label="Recorded takes">
+          <thead>
+            <tr>
+              <th aria-label="Playback"></th>
+              <th>Name</th>
+              <th>Length</th>
+              <th>Rate</th>
+              <th>Bits</th>
+              <th aria-label="Delete"></th>
+            </tr>
+          </thead>
+          <tbody id="recorded-takes-body"></tbody>
+        </table>
       </div>
+      <button id="take-use" class="primary" disabled>Use Recording</button>
     </dialog>
     <dialog
       id="sampler-settings"

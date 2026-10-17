@@ -104,13 +104,6 @@ export class ClassicUI {
         this.restoreViewSettings(this.pendingViewSettings);
     });
     this.tableResizeObserver.observe(tableWrap);
-    const pinRowControls = () =>
-      this.table.style.setProperty(
-        "--table-scroll-x",
-        tableWrap.scrollLeft + "px",
-      );
-    tableWrap.addEventListener("scroll", pinRowControls, { passive: true });
-    pinRowControls();
     for (const area of [
       this.keyboardScroll,
       tableWrap,
@@ -872,7 +865,10 @@ export class ClassicUI {
       [...row.cells].forEach((cell, i) => {
         let width = boxWidth(getComputedStyle(cell)),
           count = 0;
-        for (const child of cell.children) {
+        const children = cell.firstElementChild?.matches(".sample-cell-content")
+          ? cell.firstElementChild.children
+          : cell.children;
+        for (const child of children) {
           if (child.matches(".custom-select")) continue;
           count++;
           if (child.matches("select")) {
@@ -896,6 +892,8 @@ export class ClassicUI {
             width += px(style.width) || child.getBoundingClientRect().width;
           }
         }
+        if (cell.firstElementChild?.matches(".sample-cell-content"))
+          width += Math.max(0, count - 1) * 4;
         if (getComputedStyle(cell).display === "flex")
           width +=
             Math.max(0, count - 1) * px(getComputedStyle(cell).columnGap);
@@ -1158,7 +1156,9 @@ export class ClassicUI {
         api.sampleColor?.(s);
       };
       fixedControls.append(stripe, channels, led, handle, preview);
-      cells[0].append(fixedControls, name);
+      const content = element("span", "sample-cell-content");
+      content.append(fixedControls, name);
+      cells[0].append(content);
       const env = element("button", "mini-preview");
       env.setAttribute("aria-label", "Edit envelope for " + s.name);
       const a = Math.min(35, s.attack_ms / 25),

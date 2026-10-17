@@ -1,9 +1,11 @@
 import { installPageZoomGuard } from "./page-gestures.js";
 import { COLOR_PALETTE } from "./key-colors.js";
+import { findFreeKeyBlock, hasAssignedKeys } from "./auto-assignment.js";
 import { acceptsInput } from "./input-routing.js";
 import { isSampleMuted } from "./sample-audibility.js";
 import { EXAMPLE_FX } from "./example-kit.js";
 import { initMasterKnob, syncMasterKnob } from "./master-knob.js";
+import { RecordedTakesTable } from "./recorded-takes.js";
 import { InputMonitor } from "./input-monitor.js";
 import { applyPreferences, preferences } from "./settings.js";
 import {
@@ -452,6 +454,9 @@ function paint() {
   $("input-source").value = state.source ?? "PC Keyboard";
   $("midi-channel").value = p.channel;
   $("midi-channel").disabled = false;
+  $("midi-channel-label").hidden =
+    $("input-routing-label").hidden ||
+    ["None", "PC Keyboard"].includes(state.source ?? "PC Keyboard");
   $("memory-info").textContent =
     `${(sourceBytes() / 1048576).toFixed(1)} MB source`;
   inspector();
@@ -509,15 +514,11 @@ function syncRowValue() {
 }
 function inspector() {
   const s = selected();
-  for (const id of [
-    "duplicate-sample",
-    "spread-open",
-    "record-open",
-    "trim-open",
-  ])
+  for (const id of ["duplicate-sample", "spread-open", "trim-open"])
     $(id).disabled =
       !s ||
       (["trim-open", "spread-open", "export-sample"].includes(id) && !s.audio);
+  $("record-open").disabled = finishingRecording;
   const multi = rowSelection.mode || selectedIds().size > 1;
   document
     .querySelectorAll(".samples-panel .toolbar button")
@@ -947,7 +948,12 @@ function releaseHeld() {
 function stopAll() {
   panicEpoch++;
   auditions.clear();
-  document.querySelectorAll(".row-preview").forEach((b) => {
+  stopTake();
+  if ($("record-monitor").checked) {
+    $("record-monitor").checked = false;
+    audio.setInputMonitoring(false);
+  }
+  document.querySelectorAll("#sample-table .row-preview").forEach((b) => {
     setRowPreviewIcon(b, false);
     b.setAttribute("aria-label", "Play sample");
   });
@@ -1772,6 +1778,13 @@ listen("midi-channel", "change", (e) => {
 });
 listen("master", "input", (e) => {
   state.master = Number(e.target.value) / 100;
+  for (const player of takePlayers.values())
+    player.gain.gain.setValueAtTime(state.master, audio.context.currentTime);
+  audio.setInputMonitoring(
+    $("record-monitor").checked,
+    state.record.gain_db ?? 0,
+    state.master,
+  );
   touch();
   $("master-value").value = e.target.value + "%";
   audio.settings(state);
@@ -2042,9 +2055,91 @@ async function saveSelectedSamples() {
     `Saved ${samples.length} selected sample${samples.length === 1 ? "" : "s"} with raw WAVs and containers.`,
   );
 }
+async function offerAutoAssignment(count, samples) {
+  const pc = state.source === "PC Keyboard";
+  const area = $("keyboard-scroll"),
+    middle = area.getBoundingClientRect().left + area.clientWidth / 2;
+  const nearest = [...document.querySelectorAll(".piano-key")].sort(
+    (a, b) =>
+      Math.abs(
+        a.getBoundingClientRect().left +
+          a.getBoundingClientRect().width / 2 -
+          middle,
+      ) -
+      Math.abs(
+        b.getBoundingClientRect().left +
+          b.getBoundingClientRect().width / 2 -
+          middle,
+      ),
+  )[0];
+  const options = pc
+    ? {
+        min: Math.max(0, 60 + state.octave * 12),
+        max: Math.min(127, 74 + state.octave * 12),
+        center: 67 + state.octave * 12,
+      }
+    : { center: Number(nearest?.dataset.note ?? 64) };
+  const start = findFreeKeyBlock(samples, count, options);
+  const dialog = document.createElement("dialog");
+  dialog.id = "auto-assign-dialog";
+  dialog.className = "editor";
+  dialog.dataset.opened = String(performance.now());
+  const heading = document.createElement("h2");
+  heading.textContent = "Assign imported audio?";
+  const message = document.createElement("p");
+  message.textContent =
+    start === null
+      ? `No free block of ${count} keys fits ${pc ? "the current PC keyboard range" : "the piano"}. Load unassigned, or cancel and free some keys${pc ? " or change octave" : ""}.`
+      : `Assign ${count} unassigned samples to ${noteName(start)}–${noteName(start + count - 1)} in file-name order? Existing assignments stay unchanged${pc ? "; this block fits the current PC keyboard range" : ""}.`;
+  const actions = document.createElement("div");
+  actions.className = "dialog-actions";
+  dialog.append(heading, message, actions);
+  document.body.append(dialog);
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (value) => {
+      if (done) return;
+      done = true;
+      dialog.close();
+      dialog.remove();
+      resolve(value);
+    };
+    for (const [label, value] of [
+      ["Auto assign", { start }],
+      ["Keep unassigned", { start: null }],
+      ["Cancel import", null],
+    ]) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      button.disabled = label === "Auto assign" && start === null;
+      button.onclick = () => finish(value);
+      actions.append(button);
+    }
+    dialog.addEventListener("cancel", (e) => {
+      e.preventDefault();
+      finish(null);
+    });
+    dialog.addEventListener("close", () => finish(null));
+    dialog.showModal();
+  });
+}
+function batchAssignable(item) {
+  return !item.saved || !hasAssignedKeys(item.saved.programs[0].samples[0]);
+}
 async function applyLoadedBatch(source, items, start = 0, task = null) {
   const p = current(),
-    replacements = mixedLoaded(source, items, start);
+    replacements = mixedLoaded(source, items, start ?? 0);
+  let assignmentIndex = 0;
+  replacements.forEach((row, i) => {
+    if (!items[i].saved) row.source_wav = items[i].source_wav ?? null;
+    if (!batchAssignable(items[i])) return;
+    if (start === null) unassign(row);
+    else {
+      unassign(row);
+      row.key = start + assignmentIndex++;
+    }
+  });
   const notes = Array.from({ length: 128 }, (_, n) => n).filter((n) =>
       replacements.some((s) => assigned(s, n)),
     ),
@@ -2083,7 +2178,7 @@ async function applyLoadedBatch(source, items, start = 0, task = null) {
   changed();
   await audio.syncProgram(p);
   status(
-    `Loaded ${replacements.length} samples. Container settings were restored; WAV keys use consecutive notes.`,
+    `Loaded ${replacements.length} samples. Container settings were restored; imported audio ${start === null ? "is unassigned" : "uses consecutive keys"}.`,
   );
   return true;
 }
@@ -2152,6 +2247,22 @@ async function addFiles(files) {
     if (current() !== p || !p.samples.includes(s)) return;
     if (items.length === 1) {
       if (items[0].saved) {
+        const incoming = items[0].saved.programs[0].samples[0];
+        const notes = Array.from({ length: 128 }, (_, n) => n).filter((n) =>
+          assigned(incoming, n),
+        );
+        const collisions = overlapping(p.samples, s, notes);
+        if (collisions.length) {
+          const choice = await collisionChoice(
+            notes.filter((n) => collisions.some((row) => assigned(row, n))),
+          );
+          if (choice === "Cancel") {
+            status("Import cancelled.");
+            return;
+          }
+          if (choice === "Override")
+            for (const row of collisions) unassign(row);
+        }
         const saved = items[0].saved,
           id = s.id;
         Object.assign(s, saved.programs[0].samples[0], { id });
@@ -2176,15 +2287,22 @@ async function addFiles(files) {
     } else if (items.length) {
       if (p.samples.length - 1 + items.length > 512)
         throw Error("Maximum 512 rows");
-      const wavCount = items.filter((x) => !x.saved).length;
-      if (!wavCount) {
-        await applyLoadedBatch(s, items);
+      const assignableCount = items.filter(batchAssignable).length;
+      if (assignableCount < 2) {
+        await applyLoadedBatch(s, items, null);
         return;
       }
-      learn = { type: "batch-load", id: s.id, items };
-      $("batch-prompt").textContent =
-        `Play the root key for ${wavCount} WAV files. Containers retain their saved assignments.`;
-      openEditor("batch");
+      const savedRows = items
+        .filter(
+          (x) => x.saved && hasAssignedKeys(x.saved.programs[0].samples[0]),
+        )
+        .map((x) => x.saved.programs[0].samples[0]);
+      const assignment = await offerAutoAssignment(assignableCount, [
+        ...p.samples.filter((row) => row !== s),
+        ...savedRows,
+      ]);
+      if (assignment && current() === p)
+        await applyLoadedBatch(s, items, assignment.start);
     }
   } finally {
     busy = false;
@@ -2404,7 +2522,7 @@ async function finishImport() {
     take = null;
     takeWav = null;
     takeId = null;
-    $("take-actions").hidden = true;
+    refreshTakes();
     history.clear();
   }
   restoreSavedSettings();
@@ -2497,7 +2615,9 @@ async function importLanding(files) {
     const plan = await planLandingImport(files);
     const imported = [];
     const rows = [];
-    for (const file of plan.files) {
+    for (const file of plan.kind === "samples"
+      ? sortedFiles(plan.files)
+      : plan.files) {
       $("landing-status").textContent = "Loading " + file.name + "…";
       status("Loading " + file.name + "…");
       if (plan.kind !== "samples" || /\.nicosample$/i.test(file.name)) {
@@ -2512,8 +2632,17 @@ async function importLanding(files) {
         }
         if (plan.kind === "samples") imported.push(saved);
       } else {
-        const source = new Uint8Array(await file.arrayBuffer());
-        const decoded = rawWave(source);
+        let source = null,
+          decoded;
+        if (/\.wav$/i.test(file.name)) {
+          try {
+            source = new Uint8Array(await file.arrayBuffer());
+            decoded = rawWave(source);
+          } catch {
+            source = null;
+          }
+        }
+        decoded ??= await audio.decode(file);
         const row = singleLoaded(
           newEmpty(file.name.replace(/\.[^.]+$/, "")),
           file,
@@ -2548,6 +2677,26 @@ async function importLanding(files) {
         if (t.audio)
           (saved.takes ??= []).push({ ...t, id: uid(), exported: true });
       }
+    }
+    const assignableRows = rows.filter((row) => !hasAssignedKeys(row));
+    if (plan.kind === "samples" && assignableRows.length > 1) {
+      const assignment = await offerAutoAssignment(assignableRows.length, [
+        ...target.samples,
+        ...rows.filter((row) => !assignableRows.includes(row)),
+      ]);
+      if (!assignment) {
+        status("Import cancelled.");
+        return;
+      }
+      assignableRows.forEach((row, i) => {
+        if (assignment.start === null) unassign(row);
+        else {
+          row.key = assignment.start + i;
+          row.root_note = null;
+          row.low_note = row.high_note = null;
+          row.spread_settings = null;
+        }
+      });
     }
     const existing = state.programs.filter((p) => !wasLanding || p !== target);
     const incomingPrograms = imported.flatMap((saved) => saved.programs);
@@ -2589,6 +2738,22 @@ async function importLanding(files) {
         await inputMonitor.deactivate("import");
       else if (inputConnected) await disconnectRecordingInput();
     }
+    if (plan.kind === "samples") {
+      const notes = Array.from({ length: 128 }, (_, n) => n).filter((n) =>
+        rows.some((row) => assigned(row, n)),
+      );
+      const collisions = overlapping(target.samples, null, notes);
+      if (collisions.length) {
+        const choice = await collisionChoice(
+          notes.filter((n) => collisions.some((row) => assigned(row, n))),
+        );
+        if (choice === "Cancel") {
+          status("Import cancelled.");
+          return;
+        }
+        if (choice === "Override") for (const row of collisions) unassign(row);
+      }
+    }
     stopAll();
     stopTrim();
     cancelLearning();
@@ -2599,7 +2764,7 @@ async function importLanding(files) {
       take = null;
       takeWav = null;
       takeId = null;
-      $("take-actions").hidden = true;
+      refreshTakes();
       state = imported[0];
       state.takes = nextTakes;
       restoreColumnWidths();
@@ -2728,7 +2893,9 @@ function refreshMidi() {
   );
   const connected = inputs.length > 0;
   $("input-routing-label").hidden = !connected;
-  $("midi-channel-label").hidden = !connected;
+  $("midi-channel-label").hidden =
+    !connected ||
+    ["None", "PC Keyboard"].includes(state.source ?? "PC Keyboard");
   $("connect-midi").hidden = connected;
   const value = state.source ?? "PC Keyboard";
   $("input-source").replaceChildren(
@@ -2835,7 +3002,8 @@ document.addEventListener(
       (e.metaKey || e.ctrlKey) &&
       key === "a" &&
       !editing(e.target) &&
-      !$("trim-dialog").open
+      !$("trim-dialog").open &&
+      !$("record-dialog").open
     ) {
       e.preventDefault();
       const p = current();
@@ -2845,6 +3013,15 @@ document.addEventListener(
       return;
     }
     if (e.key === "Escape") {
+      if (e.target.matches?.("#recorded-takes-body input")) return;
+      if (
+        $("record-dialog").open &&
+        (takeTable.selection.mode || takeTable.selection.ids.size > 1)
+      ) {
+        e.preventDefault();
+        takeTable.collapse();
+        return;
+      }
       if (rowSelection.mode || selectedIds().size > 1) {
         rowSelection.select(current().selected);
         paint();
@@ -2902,6 +3079,7 @@ document.addEventListener(
       (e.metaKey || e.ctrlKey) &&
       !e.altKey &&
       ["c", "x", "v"].includes(key) &&
+      !$("record-dialog").open &&
       !editing(e.target)
     ) {
       e.preventDefault();
@@ -2928,6 +3106,7 @@ document.addEventListener(
     if (
       e.code === "Space" &&
       !$("trim-dialog").open &&
+      !$("record-dialog").open &&
       !editing(e.target) &&
       !e.shiftKey &&
       !e.metaKey &&
@@ -2942,7 +3121,7 @@ document.addEventListener(
     if ($("record-dialog").open) {
       if (["F8", "F9", "F10"].includes(e.key)) {
         e.preventDefault();
-        if (e.key === "F8") $("take-preview").click();
+        if (e.key === "F8") safe(previewTakes());
         else if (e.key === "F9" && !recording) safe(beginRecord(false));
         else if (e.key === "F10") audio.send({ type: "recordStop" });
         return;
@@ -2954,7 +3133,8 @@ document.addEventListener(
           if (armed) audio.send({ type: "recordStop" });
           else if (!recording) safe(beginRecord(true));
         } else if (recording) audio.send({ type: "recordStop" });
-        else if (!take) safe(beginRecord(false));
+        else if (takeTable.selected().length) safe(previewTakes());
+        else safe(beginRecord(false));
         return;
       }
     }
@@ -3044,8 +3224,10 @@ let recChunks = [],
   inputConnecting = null,
   inputConnectionEpoch = 0,
   recordStart = 0,
-  takeSource = null,
-  takeBuffer = null;
+  takePlayers = new Map(),
+  takePreviewPending = new Set(),
+  takePreviewEpoch = 0,
+  takeTable = null;
 let recordDestination = null;
 const recordingFinishedWaiters = new Set();
 async function finishActiveCapture() {
@@ -3059,6 +3241,8 @@ async function finishActiveCapture() {
     await new Promise((resolve) => recordingFinishedWaiters.add(resolve));
 }
 async function disconnectRecordingInput() {
+  $("record-monitor").checked = false;
+  audio.setInputMonitoring(false);
   inputConnectionEpoch++;
   await finishActiveCapture();
   await audio.disconnectInput();
@@ -3099,17 +3283,13 @@ listen("record-open", "click", async () => {
     return;
   }
   const s = selected();
-  if (!s) return;
-  let choice = "Overwrite";
-  if (s.audio) {
-    choice = await replacementChoice(s.name);
-    if (choice === "Cancel") return;
-  }
   recordDestination = {
     programId: current().id,
-    sampleId: s.id,
-    makeNew: choice === "Make New Row",
+    sampleId: s?.id ?? null,
+    makeNew: true,
   };
+  $("record-monitor").checked = false;
+  audio.setInputMonitoring(false);
   recorderOwnsMonitor = !inputMonitor.active && !inputMonitor.wanted;
   restoreRecordingSettings();
   refreshTakes();
@@ -3121,6 +3301,9 @@ listen("record-open", "click", async () => {
   audio.send({ type: "inputMode", mode: state.record.mode });
 });
 async function closeRecorder() {
+  $("record-monitor").checked = false;
+  audio.setInputMonitoring(false);
+  stopTake();
   await finishActiveCapture();
   if (recorderOwnsMonitor) await inputMonitor.deactivate();
   if (!inputMonitor.active && inputConnected) await disconnectRecordingInput();
@@ -3281,18 +3464,12 @@ function updateRecordButtons() {
     "record-mode",
     "record-rate",
     "record-bits",
-    "take-select",
-    "take-preview",
-    "take-use",
-    "take-replace",
-    "take-export",
-    "take-discard",
-    "record-retry",
   ])
     $(id).disabled =
       locked ||
       (!!inputConnecting &&
         ["record-source", "record-device", "record-mode"].includes(id));
+  takeTable?.render();
   $("record-open").disabled = finishingRecording;
   $("record-open").classList.toggle("active", locked);
   syncControls();
@@ -3300,6 +3477,8 @@ function updateRecordButtons() {
 async function beginRecord(arm) {
   if (recording || armed || finishingRecording)
     throw Error("Wait for the current recording to finish.");
+  if ((state.takes ?? []).length >= 512)
+    throw Error("Maximum 512 recorded takes. Delete a take before recording.");
   if (!inputConnected && !(await connectRecordingInput())) return;
   if (recording || armed || finishingRecording)
     throw Error("Wait for the current recording to finish.");
@@ -3308,7 +3487,7 @@ async function beginRecord(arm) {
   takeWav = null;
   takeId = null;
   recChunks = [];
-  $("take-actions").hidden = true;
+  refreshTakes();
   recordingFormat = {
     sample_rate: Number($("record-rate").value),
     bit_depth: Number($("record-bits").value),
@@ -3328,7 +3507,29 @@ async function beginRecord(arm) {
   recording = !arm;
   armed = arm;
   recordStart = performance.now();
-  audio.send({ type: "record", mode: state.record.mode, threshold, arm });
+  const bytesPerSecond =
+    RATE * 8 +
+    recordingFormat.sample_rate *
+      recordingFormat.channels *
+      Math.ceil(recordingFormat.bit_depth / 8);
+  const maxSeconds = Math.min(
+    180,
+    (128 * 1048576 - storedBytes() - 65536) / bytesPerSecond,
+  );
+  if (maxSeconds < 0.05) {
+    recording = armed = false;
+    updateRecordButtons();
+    throw Error(
+      "Audio storage is full. Delete samples or takes before recording.",
+    );
+  }
+  audio.send({
+    type: "record",
+    mode: state.record.mode,
+    threshold,
+    arm,
+    maxSeconds,
+  });
   $("record-status").textContent = arm
     ? "Armed · waiting for threshold…"
     : "Recording…";
@@ -3338,117 +3539,145 @@ async function beginRecord(arm) {
 listen("record-start", "click", () => beginRecord(false));
 listen("record-arm", "click", () => beginRecord(true));
 listen("record-stop", "click", () => audio.send({ type: "recordStop" }));
-function stopTake() {
-  try {
-    takeSource?.stop();
-  } catch {}
-  takeSource = null;
-}
-listen("take-preview", "click", async () => {
-  if (!take) return;
-  await enable();
-  stopTake();
-  takeBuffer = audio.context.createBuffer(2, take[0].length, RATE);
-  takeBuffer.copyToChannel(take[0], 0);
-  takeBuffer.copyToChannel(take[1], 1);
-  takeSource = audio.context.createBufferSource();
-  takeSource.buffer = takeBuffer;
-  const gain = audio.context.createGain();
-  gain.gain.value = state.master;
-  takeSource.connect(gain).connect(audio.context.destination);
-  takeSource.onended = () => gain.disconnect();
-  takeSource.start();
+takeTable = new RecordedTakesTable($("recorded-takes-body"), {
+  entries: () => state.takes ?? [],
+  open: () => $("record-dialog").open,
+  locked: () => recording || armed || finishingRecording,
+  playing: (id) => takePlayers.has(id) || takePreviewPending.has(id),
+  play: (entries) => safe(previewTakes(entries)),
+  rename: (entry, name) => {
+    entry.name = name;
+    entry.exported = false;
+    touch();
+    changed();
+  },
+  remove: (entry) => {
+    stopTake(entry.id);
+    state.takes = (state.takes ?? []).filter((t) => t.id !== entry.id);
+    touch();
+    if (takeId === entry.id) {
+      take = null;
+      takeWav = null;
+      takeId = null;
+    }
+    changed();
+  },
+  selectionChanged: (entries) => {
+    $("take-use").disabled =
+      !entries.length || recording || armed || finishingRecording;
+    $("take-use").textContent =
+      entries.length > 1 ? "Use Recordings" : "Use Recording";
+    if (!recording && !armed && !finishingRecording) {
+      const entry = entries.at(-1);
+      take = entry?.audio ?? null;
+      takeWav = entry?.source_wav ?? null;
+      takeId = entry?.id ?? null;
+    }
+  },
 });
-async function useTake(replace) {
-  if (finishingRecording) return;
-  if (!take) return;
+function stopTake(id = null) {
+  takePreviewEpoch++;
+  if (id) takePreviewPending.delete(id);
+  else takePreviewPending.clear();
+  for (const [key, player] of takePlayers) {
+    if (id && key !== id) continue;
+    takePlayers.delete(key);
+    player.source.onended = null;
+    try {
+      player.source.stop();
+    } catch {}
+    player.gain.disconnect();
+  }
+  takeTable?.updatePlayback();
+}
+async function previewTakes(entries = takeTable.selected()) {
+  if (recording || armed || finishingRecording || !entries.length) return;
+  if (
+    entries.some((t) => takePlayers.has(t.id) || takePreviewPending.has(t.id))
+  ) {
+    for (const entry of entries) stopTake(entry.id);
+    return;
+  }
+  const epoch = ++takePreviewEpoch;
+  for (const entry of entries) takePreviewPending.add(entry.id);
+  takeTable.updatePlayback();
+  try {
+    await enable();
+  } catch (error) {
+    for (const entry of entries) takePreviewPending.delete(entry.id);
+    takeTable.updatePlayback();
+    throw error;
+  }
+  if (epoch !== takePreviewEpoch) {
+    for (const entry of entries) takePreviewPending.delete(entry.id);
+    takeTable.updatePlayback();
+    return;
+  }
+  for (const entry of entries) takePreviewPending.delete(entry.id);
+  for (const entry of entries) {
+    const buffer = audio.context.createBuffer(2, entry.audio[0].length, RATE);
+    buffer.copyToChannel(entry.audio[0], 0);
+    buffer.copyToChannel(entry.audio[1], 1);
+    const source = audio.context.createBufferSource(),
+      gain = audio.context.createGain();
+    source.buffer = buffer;
+    gain.gain.value = state.master;
+    source.connect(gain).connect(audio.context.destination);
+    takePlayers.set(entry.id, { source, gain });
+    source.onended = () => {
+      if (takePlayers.get(entry.id)?.source === source)
+        takePlayers.delete(entry.id);
+      gain.disconnect();
+      takeTable.updatePlayback();
+    };
+    source.start();
+  }
+  takeTable.updatePlayback();
+}
+async function useTake() {
+  if (recording || armed || finishingRecording) return;
+  const entries = takeTable.selected();
+  if (!entries.length) return;
   const p =
     state.programs.find((p) => p.id === recordDestination?.programId) ??
     current();
-  if (!replace && p.samples.length >= 512) throw Error("Maximum 512 rows");
-  const target =
-    p.samples.find((s) => s.id === recordDestination?.sampleId) ?? selected();
-  const old = replace ? target : null;
-  if (replace && !old) throw Error("Select a sample first");
-  if (
-    old &&
-    p.dirty &&
-    !(await discardGuard(
-      `Replace audio and reset trim for “${old.name}”?`,
-      true,
-    ))
-  )
-    return;
-  const used = projectedBytes(take, old, takeWav);
-  if (used > 128 * 1048576) throw Error("128 MB source-audio budget reached");
-  const s = old ?? {
-    ...(target ?? newEmpty()),
-    id: uid(),
-    name: `Recording ${new Date().toLocaleTimeString()}`,
-  };
-  if (old) history.delete(s.id);
-  Object.assign(s, {
-    audio: take,
-    source_wav: takeWav,
-    recording_format: recordingFormat,
-    file_name: s.name + ".wav",
-    audio_file: null,
-    trim_start: 0,
-    trim_end: take[0].length,
-    loop_start: 0,
-    loop_end: take[0].length,
-    reverse: false,
-    normalization: null,
-    crush_rate: Math.min(recordingFormat?.sample_rate ?? RATE, RATE),
-    crush_bits: recordingFormat?.bit_depth ?? 32,
-    level: 0.5,
-    audio_dirty: false,
-  });
-  if (!old) p.samples.push(s);
+  if (p.samples.length + entries.length > 512) throw Error("Maximum 512 rows");
+  for (const entry of entries) {
+    const s = {
+      ...newEmpty(),
+      name: entry.name,
+      audio: entry.audio,
+      source_wav: entry.source_wav,
+      recording_format: entry.recording_format,
+      file_name: entry.name + ".wav",
+      trim_start: 0,
+      trim_end: entry.audio[0].length,
+      loop_start: 0,
+      loop_end: entry.audio[0].length,
+      crush_rate: Math.min(entry.recording_format?.sample_rate ?? RATE, RATE),
+      crush_bits: entry.recording_format?.bit_depth ?? 32,
+      level: 0.5,
+      audio_dirty: false,
+    };
+    p.samples.push(s);
+    p.selected = s.id;
+    checkpoint(s);
+  }
   touch(p);
-  p.selected = s.id;
-  audio.forget(s.id);
-  checkpoint(s);
-  take = null;
-  takeWav = null;
-  takeId = null;
-  stopTake();
-  $("take-actions").hidden = true;
   await closeRecorder();
   paint();
   changed();
   await audio.syncProgram(p);
-  status("Recording added. Use Trim to edit its boundaries.");
+  status("Recordings added. Original takes remain in the recorder.");
 }
-listen("take-use", "click", () => useTake(!recordDestination?.makeNew));
-listen("take-replace", "click", () => useTake(true));
-listen("take-export", "click", () => {
-  if (take) {
-    download(takeWav ?? encodeWav(take), "Recording.wav", "audio/wav");
-    const entry = state.takes?.find((t) => t.id === takeId);
-    if (entry) entry.exported = true;
-    changed();
-  }
-});
-listen("take-discard", "click", async () => {
-  if (!take) return;
-  if (
-    !(await discardGuard(
-      "Delete this recorded take from local recovery?",
-      true,
-    ))
-  )
-    return;
-  stopTake();
-  state.takes = (state.takes ?? []).filter((t) => t.id !== takeId);
-  take = null;
-  takeWav = null;
-  takeId = null;
-  $("take-actions").hidden = true;
-  refreshTakes();
-  changed();
-  $("record-status").textContent = "Take deleted. Ready to record.";
-});
+listen("take-use", "click", useTake);
+listen("record-monitor", "change", () =>
+  audio.setInputMonitoring(
+    $("record-monitor").checked,
+    state.record.gain_db ?? 0,
+    state.master,
+  ),
+);
 async function finishRecording(m) {
   finishingRecording = true;
   recording = armed = false;
@@ -3508,32 +3737,27 @@ async function finishRecording(m) {
     takeWav = finishedWav;
     take = finishedTake;
     recordingFormat = { ...format };
-    if (
-      (state.takes ?? []).length < 512 &&
-      storedBytes() + take[0].byteLength * 2 + takeWav.byteLength <=
-        128 * 1048576
-    ) {
-      takeId = uid();
-      (state.takes ??= []).push({
-        id: takeId,
-        name: `Take ${new Date().toLocaleTimeString()}`,
-        audio: take,
-        source_wav: takeWav,
-        recording_format: { ...format },
-      });
-      changed();
-      refreshTakes();
-    } else
+    takeId = uid();
+    (state.takes ??= []).push({
+      id: takeId,
+      name: `Take ${new Date().toLocaleTimeString()}`,
+      audio: take,
+      source_wav: takeWav,
+      recording_format: { ...format },
+    });
+    changed();
+    if (storedBytes() > 128 * 1048576)
       report(
         Error(
-          "Local audio budget reached: this take is not autosaved. Export it now.",
+          "Take retained in the recorder. Free audio storage before saving the bank.",
         ),
       );
-    $("take-info").textContent = takeDescription();
-    $("take-actions").hidden = false;
+    takeTable.selection.select(takeId);
+    takeTable.primary = takeId;
+    refreshTakes();
     $("record-status").textContent = m.limited
-      ? "3-minute limit reached. Take is ready."
-      : "Take ready. Preview, save or add it as a sample.";
+      ? "Recording limit reached. Take stored."
+      : "Take stored. Play, rename or select recordings below.";
   } finally {
     finishingRecording = false;
     for (const resolve of recordingFinishedWaiters) resolve();
@@ -3541,37 +3765,10 @@ async function finishRecording(m) {
     updateRecordButtons();
   }
 }
-function selectRecordedTake(entry) {
-  stopTake();
-  take = entry?.audio ?? null;
-  takeWav = entry?.source_wav ?? null;
-  recordingFormat = entry?.recording_format ?? null;
-  takeId = entry?.id ?? null;
-  $("take-select").value = takeId ?? "";
-  $("take-info").textContent = take ? takeDescription() : "";
-  $("take-actions").hidden = !take;
-}
 function refreshTakes() {
-  const entries = state.takes ?? [];
-  $("take-select").replaceChildren(
-    option("", "Choose a recorded take"),
-    ...entries.map((t) =>
-      option(t.id, `${t.name} · ${(t.audio[0].length / RATE).toFixed(2)} s`),
-    ),
-  );
-  if (takeId && !entries.some((t) => t.id === takeId)) selectRecordedTake(null);
-  if (!take && entries.length) selectRecordedTake(entries.at(-1));
-  else {
-    $("take-select").value = takeId ?? "";
-    $("take-actions").hidden = !take;
-    if (take) $("take-info").textContent = takeDescription();
-  }
+  takeTable.render();
   syncControls();
 }
-listen("take-select", "change", (e) => {
-  if (recording || armed || finishingRecording) return;
-  selectRecordedTake(state.takes?.find((t) => t.id === e.target.value));
-});
 function audioEvent(m) {
   updateBaseLatency();
   if (m.type === "error" || m.type === "fatal") {
@@ -3627,6 +3824,8 @@ function audioEvent(m) {
     $("record-status").textContent = "Recording…";
   } else if (m.type === "recordDone") void finishRecording(m).catch(report);
   else if (m.type === "inputEnded") {
+    $("record-monitor").checked = false;
+    audio.setInputMonitoring(false);
     if (inputMonitor?.active) safe(inputMonitor.deactivate("input-ended"));
     inputConnected = false;
     updateRecordButtons();
@@ -3668,7 +3867,6 @@ listen("reset-session", "click", async () => {
   takeWav = null;
   takeId = null;
   refreshTakes();
-  $("take-actions").hidden = true;
   history.clear();
   audio.prepared.clear();
   audio.generations.clear();
@@ -3886,18 +4084,6 @@ function refreshTrim(s) {
       sample: audio.descriptor(descriptor),
     });
 }
-listen("take-stop", "click", stopTake);
-listen("record-retry", "click", () => {
-  if (recording || armed || finishingRecording) return;
-  stopTake();
-  take = null;
-  takeWav = null;
-  takeId = null;
-  $("take-actions").hidden = true;
-  $("take-select").value = "";
-  $("record-status").textContent = "Ready to record.";
-  updateRecordButtons();
-});
 
 state.source = "PC Keyboard";
 state.programs[0].landing = true;
@@ -4120,10 +4306,6 @@ for (const id of ["record-rate", "record-bits"])
     changed();
   });
 
-function takeDescription() {
-  const f = recordingFormat;
-  return `${(take[0].length / RATE).toFixed(2)} s · ${f?.channels === 1 ? "mono" : "stereo"} · ${f ? f.sample_rate / 1000 : 44.1} kHz · ${f?.bit_depth ?? 32}-bit`;
-}
 let renderDefaults = null;
 function prepareRenderOptions() {
   const samples = current().samples.filter(
@@ -4260,6 +4442,11 @@ $("resample-dialog").addEventListener(
 listen("record-gain", "input", (e) => {
   state.record.gain_db = Math.max(-24, Math.min(24, Number(e.target.value)));
   audio.send({ type: "inputGain", db: state.record.gain_db });
+  audio.setInputMonitoring(
+    $("record-monitor").checked,
+    state.record.gain_db,
+    state.master,
+  );
   changed();
 });
 window.addEventListener("sampler-before-update", (event) => {

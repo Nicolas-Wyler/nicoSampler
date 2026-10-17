@@ -91,6 +91,25 @@ try {
       await page.addStyleTag({ content: "#offline-status { display: none !important; }" });
       for (const width of [320, 390, 1150]) {
         await page.setViewportSize({ width, height: 800 });
+        await page.waitForTimeout(100);
+        const pinned = await page.evaluate(async () => {
+          const wrap = document.querySelector("#table-wrap");
+          const first = document.querySelector("#sample-table tr td:first-child");
+          const before = first.getBoundingClientRect().left;
+          wrap.scrollLeft = wrap.scrollWidth;
+          await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+          const left = first.getBoundingClientRect();
+          const header = document.querySelector("#table-head th:first-child").getBoundingClientRect();
+          const level = document.querySelector("#sample-table tr .level-cell");
+          const right = level.getBoundingClientRect();
+          const rightHeader = document.querySelector("#table-head .level-cell").getBoundingClientRect();
+          return Math.abs(before - left.left) < 1 && Math.abs(header.left - left.left) < 1
+            && Math.abs(right.right - rightHeader.right) < 1
+            && first.contains(document.elementFromPoint(left.left + left.width - 2, left.top + left.height / 2))
+            && level.contains(document.elementFromPoint(right.left + right.width / 2, right.top + right.height / 2));
+        });
+        assert.ok(pinned, `Sample and Level stay pinned and hittable at ${width}px`);
+        await page.locator("#table-wrap").evaluate(e => { e.scrollLeft = 0; });
         await page.locator("#sampler-settings-open").click();
         assert.ok(await page.locator("#sampler-settings").isVisible());
         const fits = await page.locator("#sampler-settings").evaluate(e => {

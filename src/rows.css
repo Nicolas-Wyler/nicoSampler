@@ -450,11 +450,13 @@ tfoot .add-sample-row td {
   opacity: 0.4;
 }
 
-/* Offset the control group, not its entire cell, so the name keeps scrolling normally. */
+/* Pin the complete Sample column through the browser compositor. */
 #sample-table td:first-child {
-  position: relative;
+  position: sticky;
+  left: 0;
   z-index: 2;
-  overflow: visible;
+  overflow: hidden;
+  box-shadow: inset -1px 0 var(--line);
 }
 #sample-table .row-fixed-controls {
   position: relative;
@@ -465,7 +467,7 @@ tfoot .add-sample-row td {
   height: 48px;
   align-items: center;
   gap: 2px;
-  transform: translateX(var(--table-scroll-x, 0px));
+  transform: none;
   background: #1d261f;
 }
 #sample-table tr.selected .row-fixed-controls {
@@ -478,6 +480,7 @@ tfoot .add-sample-row td {
   position: sticky;
   right: 0;
   z-index: 2;
+  box-shadow: inset 1px 0 var(--line);
 }
 #sample-grid th.level-cell {
   position: sticky;
@@ -527,3 +530,16 @@ tfoot .add-sample-row td {
 .piano-key:not(.black) {
   padding-bottom: 7px;
 }
+
+#sample-grid th:first-child {position:sticky;left:0;z-index:4;box-shadow:inset -1px 0 var(--line);}
+#sample-grid th.level-cell {box-shadow:inset 1px 0 var(--line);}
+#table-wrap {overscroll-behavior-x:none;isolation:isolate;}
+#sample-table.selection-mode tr:not(.selected) td:first-child,
+#sample-table.selection-mode tr:not(.selected) td.level-cell {opacity:1;}
+#sample-table.selection-mode tr:not(.selected) td:first-child > *,
+#sample-table.selection-mode tr:not(.selected) td.level-cell > * {opacity:.4;}
+
+/* WebKit cannot pin a table cell whose own display type is flex. */
+#sample-table td:first-child {display:table-cell;}
+#sample-table .sample-cell-content {display:flex;align-items:center;gap:4px;min-width:0;}
+#sample-table.selection-mode tr.selected td > .sample-cell-content {opacity:1;}

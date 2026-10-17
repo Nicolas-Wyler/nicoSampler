@@ -59,6 +59,10 @@ class SamplerProcessor extends AudioWorkletProcessor {
         a.set_master(m.master);
         for (let i = 0; i < 2; i++) a.set_fx(i, m.fx[i].time, m.fx[i].feedback);
       } else if (m.type === "record") {
+        if (Number.isFinite(m.maxSeconds))
+          this.maxFrames = Math.floor(
+            sampleRate * Math.max(0.01, Math.min(180, m.maxSeconds)),
+          );
         this.recordFrames = 0;
         this.recIndex = 0;
         this.recChannels = m.mode;

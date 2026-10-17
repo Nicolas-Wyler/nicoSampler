@@ -279,6 +279,11 @@ export class AudioController {
     this.stream = stream;
     this.input = this.context.createMediaStreamSource(stream);
     this.input.connect(this.node);
+    this.setInputMonitoring(
+      this.inputMonitoringWanted,
+      this.inputMonitoringDb ?? 0,
+      this.inputMonitoringMaster ?? 1,
+    );
     for (const track of stream.getAudioTracks())
       track.onended = () => {
         this.send({ type: "recordStop" });
@@ -288,7 +293,25 @@ export class AudioController {
       (d) => d.kind === "audioinput",
     );
   }
+  setInputMonitoring(enabled, db = 0, master = 1) {
+    this.inputMonitoringWanted = Boolean(enabled);
+    this.inputMonitoringDb = db;
+    this.inputMonitoringMaster = master;
+    if (!this.input || !this.context) return;
+    if (!this.monitorOutput && !enabled) return;
+    if (!this.monitorOutput) {
+      this.monitorOutput = this.context.createGain();
+      this.input.connect(this.monitorOutput);
+      this.monitorOutput.connect(this.context.destination);
+    }
+    this.monitorOutput.gain.setValueAtTime(
+      enabled ? Math.pow(10, db / 20) * master : 0,
+      this.context.currentTime,
+    );
+  }
   async disconnectInput() {
+    this.monitorOutput?.disconnect();
+    this.monitorOutput = null;
     this.input?.disconnect();
     this.input = null;
     if (this.stream) {

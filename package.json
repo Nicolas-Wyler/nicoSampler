@@ -12,6 +12,8 @@
     "test": "node --test tests/*.test.js",
     "test:integration": "node scripts/test-integration.mjs",
     "test:browser": "node scripts/test-browser.mjs",
+    "test:recorder": "node scripts/test-recorder.mjs",
+    "test:auto-assign": "node scripts/test-auto-assign.mjs",
     "build:examples": "node scripts/build-examples.mjs",
     "build:release": "node scripts/build-release.mjs",
     "check:public": "node scripts/check-public.mjs",

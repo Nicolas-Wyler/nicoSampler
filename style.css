@@ -1662,3 +1662,24 @@ button.brand-icon {padding:0;border:0;background:transparent;overflow:hidden;cur
 
 .row-preview {display:grid;place-items:center;}
 .row-preview svg {display:block;width:32px;height:32px;pointer-events:none;}
+
+.record-input-row {align-items:center;flex-wrap:nowrap;}
+.record-audible-monitor {display:flex;align-items:center;gap:7px;white-space:nowrap;}
+#recorded-takes-wrap {overflow:auto;max-height:250px;min-height:52px;position:relative;margin:8px 0;}
+#recorded-takes-table {border-collapse:collapse;min-width:100%;width:max-content;font-size:12px;}
+#recorded-takes-table th {position:sticky;top:0;background:var(--panel2);z-index:1;text-align:left;}
+#recorded-takes-table td,#recorded-takes-table th {padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;}
+#recorded-takes-table tr.selected {background:#354a2d;}
+#recorded-takes-table td:first-child,#recorded-takes-table th:first-child {position:sticky;left:0;background:var(--panel);z-index:2;padding:0;}
+#recorded-takes-table tr.selected td:first-child {background:#354a2d;}
+#recorded-takes-table .take-play {width:32px;height:40px;min-width:32px;}
+#recorded-takes-table .take-name {background:transparent;border:0;padding:0;text-align:left;min-width:140px;max-width:320px;overflow:hidden;text-overflow:ellipsis;}
+#recorded-takes-table input[type=text] {width:200px;}
+#recorded-takes-table .row-delete {width:48px;}
+#recorded-takes-body.selection-mode tr:not(.selected) {opacity:.4;}
+
+#recorded-takes-table {user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}
+
+#recorded-takes-table td:first-child {display:table-cell;}
+#recorded-takes-table th:first-child {z-index:3;}
+#recorded-takes-table .take-play {margin:auto;}
