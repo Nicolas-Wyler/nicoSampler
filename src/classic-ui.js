@@ -116,6 +116,19 @@ export class ClassicUI {
       });
     }
   }
+  setKeyboardCollapsed(collapsed) {
+    document
+      .querySelector(".keyboard-panel")
+      .classList.toggle("is-folded", collapsed);
+    const button = document.getElementById("keyboard-fold");
+    button.textContent = collapsed ? "⌃" : "⌄";
+    button.setAttribute("aria-expanded", String(!collapsed));
+    button.setAttribute(
+      "aria-label",
+      collapsed ? "Expand piano" : "Fold piano",
+    );
+    button.title = collapsed ? "Expand piano" : "Fold piano";
+  }
   getViewSettings() {
     if (!this.keyboardScroll.clientWidth && this.pendingViewSettings)
       return structuredClone(this.pendingViewSettings);
@@ -126,6 +139,9 @@ export class ClassicUI {
     const keyboard = this.keyboardScroll;
     return {
       keyboard: {
+        collapsed: document
+          .querySelector(".keyboard-panel")
+          .classList.contains("is-folded"),
         zoom: this.keyboardZoom,
         position:
           keyboard.scrollWidth > 0
@@ -160,10 +176,15 @@ export class ClassicUI {
     const zoom = finite(settings.keyboard?.zoom, 1, 1, 75 / 7),
       position = finite(settings.keyboard?.position, 0.5, 0, 1);
     this.pendingViewSettings = {
-      keyboard: { zoom, position },
+      keyboard: {
+        zoom,
+        position,
+        collapsed: settings.keyboard?.collapsed === true,
+      },
       tableScroll: finite(settings.tableScroll, 0, 0, 1),
       programScroll: finite(settings.programScroll, 0, 0, 1),
     };
+    this.setKeyboardCollapsed(settings.keyboard?.collapsed === true);
     this.keyboardZoom = zoom;
     this.viewRestoreFrame = requestAnimationFrame(() => {
       if (!this.keyboardScroll.clientWidth) return;
@@ -601,16 +622,6 @@ export class ClassicUI {
     };
     for (const event of ["pointerup", "pointercancel", "lostpointercapture"])
       area.addEventListener(event, end, true);
-    document
-      .getElementById("keyboard-zoom-in")
-      ?.addEventListener("click", () =>
-        this.setKeyboardZoom(this.keyboardZoom * 1.5),
-      );
-    document
-      .getElementById("keyboard-zoom-out")
-      ?.addEventListener("click", () =>
-        this.setKeyboardZoom(this.keyboardZoom / 1.5),
-      );
     new ResizeObserver(() => this.applyPianoZoom()).observe(area);
   }
   setKeyboardZoom(value, clientX, fromMotion = false) {
@@ -644,10 +655,6 @@ export class ClassicUI {
           ? whites.filter((v) => v < n).length * width - width * 0.32
           : whites.indexOf(n) * width) + "px";
     }
-    const zoomIn = document.getElementById("keyboard-zoom-in"),
-      zoomOut = document.getElementById("keyboard-zoom-out");
-    if (zoomIn) zoomIn.disabled = this.keyboardZoom >= 75 / 7;
-    if (zoomOut) zoomOut.disabled = this.keyboardZoom <= 1;
   }
   buildHeaders() {
     this.cols.replaceChildren(

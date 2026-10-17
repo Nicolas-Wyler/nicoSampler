@@ -1,3 +1,8 @@
+import { APP_VERSION } from "./version.js";
+document.title = `nicoSampler · v${APP_VERSION}`;
+document.querySelectorAll("[data-app-version]").forEach((element) => {
+  element.textContent = "v" + APP_VERSION;
+});
 const badge = document.getElementById("offline-status");
 const button = document.getElementById("app-update");
 const workerURL = new URL("../sw.js", import.meta.url);
@@ -13,8 +18,8 @@ function placeButton() {
   if (landing) document.body.append(button);
   else
     document
-      .querySelector(".program-header")
-      .insertBefore(button, document.querySelector(".output"));
+      .querySelector(".audio-tools")
+      .insertBefore(button, document.getElementById("panic"));
 }
 placeButton();
 new MutationObserver(placeButton).observe(document.getElementById("sampler"), {
@@ -86,10 +91,21 @@ async function checkUpdates() {
     const local = await rpc(registration.active, { type: "OFFLINE_STATUS" });
     const response = await fetch(workerURL, { cache: "no-store" });
     if (!response.ok) throw Error("Update check unavailable");
-    const remote = /const CACHE = "([^"]+)"/.exec(await response.text())?.[1];
+    const awaitText = await response.text();
+    const remote = /const CACHE = "([^"]+)"/.exec(awaitText)?.[1];
     if (!remote) throw Error("Invalid update response");
-    if (remote !== local.version) show("Update", true, "update");
-    else {
+    const remoteVersion =
+      /const VERSION = "([^"]+)"/.exec(awaitText)?.[1] ?? null;
+    if (remote !== local.version || remoteVersion !== APP_VERSION) {
+      show(
+        remoteVersion ? `Update v${remoteVersion}` : "Update",
+        true,
+        "update",
+      );
+      button.title = remoteVersion
+        ? `Current v${APP_VERSION} → update v${remoteVersion}`
+        : `Current v${APP_VERSION} → update available`;
+    } else {
       show("No updates found");
       hideTimer = setTimeout(() => {
         if (!updating) show("↻", true, "check");
@@ -153,7 +169,7 @@ async function prepare() {
   show(navigator.onLine ? "Checking…" : "Offline");
   badge.hidden = false;
   delete badge.dataset.error;
-  badge.textContent = "Downloading offline copy… Keep this app open";
+  badge.textContent = `nicoSampler v${APP_VERSION} · Preparing offline copy…`;
   try {
     if (!("serviceWorker" in navigator))
       throw Error("Offline installation unavailable");
@@ -171,8 +187,7 @@ async function prepare() {
     });
     if (!result.ready) throw Error("Offline download incomplete");
     await navigator.storage?.persist?.().catch(() => false);
-    badge.textContent =
-      "✓ Ready offline — app and examples saved on this device";
+    badge.textContent = `✓ v${APP_VERSION} · Ready offline`;
     badge.onclick = () => {
       badge.hidden = true;
     };

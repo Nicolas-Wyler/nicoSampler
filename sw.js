@@ -1,3 +1,4 @@
+const VERSION = "0.2.0-dev";
 const CACHE = "nico-sampler-classic-v2-c8b3dfd7325b";
 const ASSETS = [
   "./",
@@ -9,6 +10,7 @@ const ASSETS = [
   "./icons/icon-512.png",
   "./src/app.js",
   "./src/offline-install.js",
+  "./src/version.js",
   "./src/example-kit.js",
   "./src/master-knob.js",
   "./src/input-monitor.js",
@@ -189,6 +191,7 @@ self.addEventListener("message", (event) => {
       );
       event.ports[0]?.postMessage({
         version: CACHE,
+        appVersion: VERSION,
         manualUpdates: true,
         ready: present.every(Boolean),
         cached: present.filter(Boolean).length,

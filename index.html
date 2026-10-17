@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="./style.css" />
     <link rel="stylesheet" href="./src/rows.css" />
     <link rel="stylesheet" href="./src/landing.css" />
-    <title>Minimal Sampler · Classic</title>
+    <title>nicoSampler</title>
   </head>
   <body>
     <button id="offline-status" type="button" role="status" aria-live="polite">
@@ -27,6 +27,7 @@
         <span>or click to choose files</span>
       </button>
       <button id="landing-new">Empty project</button>
+      <small class="app-version" data-app-version></small>
       <p id="landing-status" role="status" aria-live="polite"></p>
       <input
         id="landing-files"
@@ -36,11 +37,18 @@
         hidden
       />
     </section>
-    <main hidden id="sampler" aria-label="Minimal Sampler Classic">
+    <main hidden id="sampler" aria-label="nicoSampler">
       <header class="program-header">
-        <span class="brand-icon" title="Minimal Sampler Classic">n.</span>
+        <button
+          id="sampler-settings-open"
+          class="brand-icon"
+          type="button"
+          aria-label="Sampler settings"
+          title="Sampler settings"
+        >
+          <img src="./icons/icon.svg?v=cc988b10f0d3" alt="" />
+        </button>
         <nav id="program-ribbon" aria-label="Programs"></nav>
-        <button id="app-update" type="button" hidden>Checking…</button>
         <div class="output">
           <div class="meter-stack">
             <div class="meter-row">
@@ -81,6 +89,23 @@
             </div>
           </div>
         </div>
+        <div class="master">
+          <button
+            id="master-knob"
+            class="knob"
+            type="button"
+            role="slider"
+            aria-label="Master volume"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="50"
+          >
+            <span class="dial" aria-hidden="true"></span>
+          </button>
+          <input id="master" type="range" min="0" max="100" value="50" hidden />
+          <output id="master-value">50%</output>
+          <span>Master</span>
+        </div>
       </header>
       <section class="storagebar" aria-label="Program and bank files">
         <select id="save-kind" aria-label="Save">
@@ -120,23 +145,6 @@
           ><span id="midi-status" class="subtle"></span>
         </div>
         <span class="spacer"></span>
-        <div class="master">
-          <span>Master</span>
-          <button
-            id="master-knob"
-            class="knob"
-            type="button"
-            role="slider"
-            aria-label="Master volume"
-            aria-valuemin="0"
-            aria-valuemax="100"
-            aria-valuenow="50"
-          >
-            <span class="dial" aria-hidden="true"></span>
-          </button>
-          <input id="master" type="range" min="0" max="100" value="50" hidden />
-          <output id="master-value">50%</output>
-        </div>
         <button id="install" hidden>Install app</button>
         <div class="audio-tools">
           <button
@@ -144,6 +152,7 @@
             title="Enable or resume browser audio. Playing a note can enable it too."
           >
             Enable audio</button
+          ><button id="app-update" type="button" hidden>Checking…</button
           ><button id="panic">Panic</button>
         </div>
       </section>
@@ -170,30 +179,37 @@
           </table>
         </div>
       </section>
-      <div class="statusline">
-        <span id="status" role="status" aria-live="polite"
-          >Load a sample, then assign its MIDI key. Default playback:
-          mono.</span
-        ><span id="engine-status">Audio stopped</span
-        ><span id="base-latency">Base latency: unavailable</span
-        ><span id="save-status">Local autosave</span>
-      </div>
       <section
         class="keyboard-panel"
         aria-label="Onscreen keyboard always available"
       >
+        <div class="statusline octavebar">
+          <div class="piano-info">
+            <span id="status" role="status" aria-live="polite"
+              >Load a sample, then assign its MIDI key. Default playback:
+              mono.</span
+            ><span id="engine-status">Audio stopped</span
+            ><span class="app-version" data-app-version></span
+            ><span id="base-latency">Base latency: unavailable</span
+            ><span id="save-status">Local autosave</span
+            ><span id="octave-label"></span>
+          </div>
+          <div class="octave-controls">
+            <button id="octave-down">← Octave</button
+            ><button id="octave-up">Octave →</button>
+          </div>
+          <button
+            id="keyboard-fold"
+            type="button"
+            aria-label="Fold piano"
+            aria-expanded="true"
+            aria-controls="keyboard-scroll"
+          >
+            ⌄
+          </button>
+        </div>
         <div id="keyboard-scroll">
           <div id="keyboard" role="group" aria-label="Full MIDI piano"></div>
-        </div>
-        <div class="octavebar">
-          <button id="close-app">Close</button>
-          <span id="octave-label"></span>
-          <button id="octave-down">← Octave</button>
-          <button id="octave-up">Octave →</button>
-          <button id="keyboard-zoom-out" aria-label="Zoom keyboard out">
-            −
-          </button>
-          <button id="keyboard-zoom-in" aria-label="Zoom keyboard in">+</button>
         </div>
       </section>
     </main>
@@ -816,9 +832,46 @@
         ><button id="take-discard">Discard take</button>
       </div>
     </dialog>
+    <dialog
+      id="sampler-settings"
+      class="editor"
+      aria-labelledby="sampler-settings-title"
+    >
+      <header class="dialog-header">
+        <h2 id="sampler-settings-title">Sampler settings</h2>
+        <button id="sampler-settings-close" aria-label="Close settings">
+          ✕
+        </button>
+      </header>
+      <div class="settings-fields">
+        <label
+          >Master level (%)
+          <input id="settings-master" type="number" min="0" max="100" step="1"
+        /></label>
+        <label
+          >Input
+          <select id="settings-input" aria-label="Settings input"></select
+        ></label>
+        <label
+          >MIDI Ch
+          <select
+            id="settings-channel"
+            aria-label="Settings MIDI channel"
+          ></select
+        ></label>
+        <label
+          ><input id="settings-piano" type="checkbox" /> Show piano
+          keyboard</label
+        >
+      </div>
+      <p class="subtle">
+        Changes apply immediately and are saved with your bank, program and
+        local recovery.
+      </p>
+    </dialog>
     <dialog id="help-dialog" class="editor">
       <header class="dialog-header">
-        <h2>Minimal Sampler · Classic</h2>
+        <h2>nicoSampler</h2>
         <button id="help-close" aria-label="Close help">✕</button>
       </header>
       <p>

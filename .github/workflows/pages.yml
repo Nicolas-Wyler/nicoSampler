@@ -4,7 +4,7 @@ on:
     branches: [main]
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: pages
   cancel-in-progress: true
@@ -23,7 +23,16 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: npm ci
       - run: npm test
-      - run: npm run build:release -- --web-only
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.27.2'
+          cache-dependency-path: tools/launcher/go.mod
+      - run: sh scripts/build-launchers.sh
+      - run: npm run build:release
+      - name: Archive this numbered build as a release
+        run: node scripts/publish-release.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist/web

@@ -84,7 +84,7 @@ test("legacy files default missing preferences without dropping legacy globals",
   assert.equal(loaded.record.source, "system");
   assert.equal(loaded.record.bit_depth, 12);
   assert.deepEqual(loaded.viewSettings, {
-    keyboard: { zoom: 1, position: 0.5 },
+    keyboard: { collapsed: false, zoom: 1, position: 0.5 },
     tableScroll: 0,
     programScroll: 0,
   });

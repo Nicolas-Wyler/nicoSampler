@@ -1456,21 +1456,6 @@ listen("load-program", "click", () => {
   requestedLoadType = "sample_program";
   $("bank-files").click();
 });
-listen("close-app", "click", async () => {
-  if (unsavedWork() && !(await discardGuard("Close the sampler?", true)))
-    return;
-  if (inputMonitor?.active || inputMonitor?.wanted)
-    await inputMonitor.deactivate("close");
-  else if (inputConnected || recording || armed || finishingRecording)
-    await disconnectRecordingInput();
-  approvedClose = true;
-  await persist();
-  stopAll();
-  stopTrim();
-  await audio.disconnectInput();
-  await audio.context?.suspend();
-  status("Stopped. Local recovery saved; this browser tab can be closed.");
-});
 listen("input-source", "change", (e) => {
   stopAll();
   cancelLearning();
@@ -4289,4 +4274,62 @@ window.addEventListener("sampler-before-update", (event) => {
       approvedClose = true;
     })(),
   );
+});
+
+listen("keyboard-fold", "click", () => {
+  for (const id of [...pointerNotes.keys()]) releasePointer(id);
+  ui.setKeyboardCollapsed(
+    !document.querySelector(".keyboard-panel").classList.contains("is-folded"),
+  );
+  ui.queueViewChanged();
+  updateLearningDock();
+});
+
+listen("sampler-settings-open", "click", () => {
+  $("settings-master").value = $("master").value;
+  for (const [target, source] of [
+    ["settings-input", "input-source"],
+    ["settings-channel", "midi-channel"],
+  ]) {
+    $(target).replaceChildren(
+      ...[...$(source).options].map((o) => o.cloneNode(true)),
+    );
+    $(target).value = $(source).value;
+  }
+  $("settings-piano").checked = !document
+    .querySelector(".keyboard-panel")
+    .classList.contains("is-folded");
+  $("sampler-settings").showModal();
+  syncControls();
+});
+listen("sampler-settings-close", "click", () => $("sampler-settings").close());
+listen("settings-master", "change", (event) => {
+  const value = Number(event.target.value);
+  if (
+    event.target.value.trim() === "" ||
+    !Number.isFinite(value) ||
+    value < 0 ||
+    value > 100
+  ) {
+    event.target.value = $("master").value;
+    return;
+  }
+  $("master").value = String(value);
+  $("master").dispatchEvent(new Event("input", { bubbles: true }));
+});
+for (const [target, source] of [
+  ["settings-input", "input-source"],
+  ["settings-channel", "midi-channel"],
+]) {
+  listen(target, "change", () => {
+    $(source).value = $(target).value;
+    $(source).dispatchEvent(new Event("change", { bubbles: true }));
+    syncControls();
+  });
+}
+listen("settings-piano", "change", () => {
+  for (const id of [...pointerNotes.keys()]) releasePointer(id);
+  ui.setKeyboardCollapsed(!$("settings-piano").checked);
+  ui.queueViewChanged();
+  updateLearningDock();
 });

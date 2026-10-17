@@ -85,6 +85,56 @@ try {
         );
         return hit?.closest(".knob") === dial.closest(".knob");
       });
+      // The app icon opens the real settings dialog, including at phone widths.
+      await page.waitForFunction(
+        () => document.querySelector("#offline-status").textContent.includes("Ready offline"),
+        null, { timeout: 60000 },
+      );
+      if (await page.locator("#offline-status").isVisible())
+        await page.locator("#offline-status").click();
+      for (const width of [320, 390, 1150]) {
+        await page.setViewportSize({ width, height: 800 });
+        await page.locator("#sampler-settings-open").click();
+        assert.ok(await page.locator("#sampler-settings").isVisible());
+        const fits = await page.locator("#sampler-settings").evaluate(e => {
+          const r = e.getBoundingClientRect();
+          return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight;
+        });
+        assert.ok(fits, `Settings dialog fits ${width}px`);
+        await page.locator("#sampler-settings-close").click();
+      }
+      await page.locator("#sampler-settings-open").click();
+      await page.locator("#settings-master").fill("73");
+      await page.locator("#settings-master").press("Tab");
+      assert.equal(await page.locator("#master").inputValue(), "73");
+      await page.locator("#settings-master").fill("101");
+      await page.locator("#settings-master").press("Tab");
+      assert.equal(await page.locator("#settings-master").inputValue(), "73");
+      await page.locator("#settings-input").selectOption("None");
+      await page.locator("#settings-channel").selectOption("7");
+      await page.locator("#settings-piano").uncheck();
+      assert.equal(await page.locator("#input-source").inputValue(), "None");
+      assert.equal(await page.locator("#midi-channel").inputValue(), "7");
+      assert.equal(await page.locator("#keyboard-fold").getAttribute("aria-expanded"), "false");
+      await page.locator("#settings-master").focus();
+      await page.keyboard.press("Escape");
+      assert.equal(await page.locator("#sampler-settings").isVisible(), false);
+      // View preferences debounce before autosave; do not accept a stale Saved badge.
+      await page.waitForTimeout(250);
+      await page.waitForFunction(() => document.querySelector("#save-status").textContent === "Saved on this device");
+      await page.reload();
+      await page.waitForFunction(() => document.querySelector("#sample-count").textContent === "16");
+      if (await page.locator("#offline-status").isVisible())
+        await page.locator("#offline-status").click();
+      await page.locator("#sampler-settings-open").click();
+      assert.equal(await page.locator("#settings-master").inputValue(), "73");
+      assert.equal(await page.locator("#settings-input").inputValue(), "None");
+      assert.equal(await page.locator("#settings-channel").inputValue(), "7");
+      assert.equal(await page.locator("#settings-piano").isChecked(), false);
+      await page.locator("#settings-input").selectOption("PC Keyboard");
+      await page.locator("#settings-channel").selectOption("All");
+      await page.locator("#settings-piano").check();
+      await page.locator("#sampler-settings-close").click();
       await page.locator("#enable-audio").click();
       await page.locator(".row-preview").first().click();
       await page.waitForFunction(
@@ -116,7 +166,7 @@ try {
       );
       assert.deepEqual(errors, []);
       console.log(
-        `${name}: landing, generated kit, WASM playback, layout, Master, bank ZIP and recovery passed`,
+        `${name}: landing, generated kit, WASM playback, layout, icon settings validation/routing/fold/recovery, Master and bank ZIP passed`,
       );
     } finally {
       await browser.close();

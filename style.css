@@ -116,9 +116,8 @@ h2 {
 .brand-icon {
   width: 30px;
   height: 30px;
-  background: var(--accent);
-  color: #18311e;
-  border-radius: 8px;
+  object-fit: contain;
+  border-radius: 6px;
   display: grid;
   place-items: center;
   font-size: 23px;
@@ -1626,3 +1625,37 @@ body {
   .octavebar {gap:3px;}
   #octave-label {min-width:0;font-size:10px;}
 }
+
+#app-update[data-action="check"] {background:transparent;border-color:transparent;color:var(--muted);opacity:.55;min-width:22px;width:22px;padding:1px;font-size:13px;box-shadow:none;}
+#app-update[data-action="check"]:hover,#app-update[data-action="check"]:focus-visible {opacity:1;border-color:var(--line);background:var(--panel);}
+.app-version {font-size:10px;color:var(--muted);white-space:nowrap;}
+
+#sampler {padding-bottom:0;}
+.keyboard-panel:before {display:none;}
+#keyboard-scroll {height:149px;border-radius:4px 4px 0 0;}
+#keyboard,.piano-key {height:132px;}
+.piano-key.black {height:82.5px;}
+.keyboard-panel .statusline {margin:0 0 3px;height:27px;gap:5px;}
+.piano-info {display:flex;gap:8px;align-items:center;flex:1;min-width:0;overflow:hidden;white-space:nowrap;}
+.piano-info>span {min-width:0;overflow:hidden;text-overflow:ellipsis;}
+.octave-controls {display:flex;align-items:center;gap:4px;flex-shrink:0;}
+#keyboard-fold {min-width:25px;padding:0 4px;flex-shrink:0;}
+.keyboard-panel.is-folded #keyboard-scroll {height:0;visibility:hidden;overflow:hidden;}
+.keyboard-panel.is-folded .octave-controls {display:none;}
+@media(max-height:620px) {#keyboard-scroll {height:129.5px;}#keyboard,.piano-key {height:112.5px;}.piano-key.black {height:70.5px;}.keyboard-panel.is-folded #keyboard-scroll {height:0;}}
+
+.program-header .master {align-self:flex-start;gap:0;line-height:10px;font-size:9px;}
+.program-header .master #master-knob {height:24px;min-height:24px;width:30px;min-width:30px;}
+.program-header .master #master-knob .dial {width:22px;height:22px;}
+
+.piano-info [data-app-version] {flex:0 0 auto;overflow:visible;}
+.keyboard-panel.is-folded #keyboard-scroll {padding-bottom:0!important;}
+.keyboard-panel.is-folded #octave-label {display:none;}
+@media(max-width:420px) {.octave-controls button {padding:2px 4px;}.piano-info {gap:4px;}}
+
+button.brand-icon {padding:0;border:0;background:transparent;overflow:hidden;cursor:pointer;}
+.brand-icon img {width:100%;height:100%;display:block;object-fit:contain;}
+.brand-icon:hover,.brand-icon:focus-visible {outline:1px solid var(--accent);outline-offset:2px;}
+.settings-fields {display:grid;gap:14px;padding:12px 0;}
+.settings-fields label {display:flex;align-items:center;justify-content:space-between;gap:16px;}
+.settings-fields input[type="number"] {width:90px;}

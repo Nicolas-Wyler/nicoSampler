@@ -124,6 +124,7 @@ export function normalizePreferences(raw = {}) {
   if (!Number.isInteger(octave) || !Number.isInteger(sizingVersion))
     throw Error("Invalid integer application setting");
   const keyboard = view.keyboard ?? {};
+  if (keyboard.collapsed != null && typeof keyboard.collapsed !== "boolean") throw Error("Invalid keyboard fold state");
   if (typeof keyboard !== "object" || Array.isArray(keyboard))
     throw Error("Invalid keyboard view");
   return {
@@ -137,6 +138,7 @@ export function normalizePreferences(raw = {}) {
     columnSizingVersion: sizingVersion,
     view: {
       keyboard: {
+        collapsed: keyboard.collapsed === true,
         zoom: number(keyboard.zoom, 1, 75 / 7, "keyboard zoom", 1),
         position: number(keyboard.position, 0, 1, "keyboard position", 0.5),
       },

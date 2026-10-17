@@ -2,7 +2,7 @@
 
 A source-available sampler that runs in your browser. Audio processing uses a C++/WebAssembly engine and an AudioWorklet; the interface uses JavaScript and HTML/CSS. No Python, plugin, or compiler is needed to play it.
 
-**Preview release:** `0.1.0-beta.2`. Desktop layout is the current focus. The repository contains the current Classic sampler only.
+**Preview builds:** every published build has its own version and downloadable release. Desktop layout is the current focus. The repository contains the current Classic sampler only.
 
 ## Start
 
@@ -39,7 +39,7 @@ Projects and recorded takes recover in this browser's local storage. They are no
 - [Portable launchers](docs/PORTABLE-LAUNCHER.md)
 - [Developer guide](docs/DEVELOPMENT.md)
 - [Compatibility and verification](docs/COMPATIBILITY.md)
-- [Release notes](release-notes/0.1.0-beta.2.md)
+- [Release notes](release-notes/0.2.md)
 - [Third-party notices](THIRD_PARTY_NOTICES.md)
 
 ## License

@@ -81,3 +81,7 @@ The update indicator sits left of the In/Out meters (top right on the landing pa
 Recording Gain sits beside the input meter and ranges from −24 to +24 dB. It affects the meter, threshold trigger and recorded audio equally, and is saved with recording preferences. New sessions default to 50% master volume; saved session/project levels are retained.
 
 Recording uses one **Input** menu for the default input, microphones/interfaces and **Share tab / system audio…**. The browser sharing picker determines available tab/screen audio and requires explicit permission. Device names are refreshed when the recorder opens and hardware changes. Opening Record activates the header input monitor; closing Record deactivates it unless it was already active beforehand. The ↻ control beside the meters can check for updates manually. Master, the app mark and source-memory usage remain visible in narrow windows; Master’s label sits above its knob without a visible percentage.
+
+## Sampler settings
+
+Click the app icon at the top left to open Sampler settings. Master level, input routing, MIDI channel and piano visibility apply immediately. Close with the × button or Escape. These preferences are included in local recovery and bank/program saves.

@@ -41,8 +41,12 @@ Build portable servers with `scripts/build-launchers.sh` or `.ps1` using the doc
 
 `npm run build:release` creates the static browser build, docs bundle, examples bundle, source archive and architecture-specific portable packages in `dist/`, plus SHA256SUMS. It refreshes the service-worker content hash for the distributed copy after its README/docs are assembled. Do not edit packaged files after hashing. `npm run check:public` rejects personal paths, credentials, recordings and private verification artifacts from the public source/distribution plan.
 
-The Pages workflow publishes only the static `dist/web` directory. CI runs tests and produces reviewable artifacts; release upload is a maintainer action after approval. No workflow sends user audio or browser recovery to a server.
+The Pages workflow tests and archives each build as a numbered GitHub prerelease, then publishes the static `dist/web` directory. Versions use the base major/minor and workflow run number; reruns add a build suffix. The window title, visible version, update target, service worker and archive manifest share that version. Existing release assets are never overwritten. Local builds get timestamped development versions; `SAMPLER_BUILD_VERSION` can reproduce a reviewed candidate. No workflow sends user audio or browser recovery to a server.
 
 ## Contributions and licensing
 
 This is source available under a custom license, not permissive/OSI open source. Read LICENSE before redistributing or commercializing a fork. Contributions should be offered under the same project terms, preserve third-party notices, and identify meaningful behavior changes. Music made with the app is unrestricted by the software-distribution condition and needs no attribution.
+
+## Local iPhone layout preview
+
+Every local release build also generates ignored `artifacts/iphone-preview/Start.command`. Double-click it to launch WebKit at a fixed iPhone 12 Pro Max viewport (428 × 926) with touch and coarse-pointer settings. Use `iPhone 12 Smaller.command` for a second 390 × 844 preview; both can run together. Install Playwright WebKit first with `npx playwright install webkit` if needed. This preview and its app copy stay local and are excluded from public archives. It simulates layout, not physical iOS hardware, permissions or Safari integration.

@@ -1,3 +1,4 @@
+import { buildVersion } from "./lib/build-version.mjs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -7,7 +8,7 @@ import { publicFiles, root } from "./public-files.mjs";
 const pkg = JSON.parse(
   await fs.readFile(path.join(root, "package.json"), "utf8"),
 );
-const version = pkg.version,
+const version = buildVersion(pkg.version),
   tag = "v" + version,
   dist = path.join(root, "dist"),
   web = path.join(dist, "web");
@@ -41,6 +42,18 @@ const webParts = [
 ];
 for (const name of webParts)
   await fs.cp(path.join(root, name), path.join(web, name), { recursive: true });
+const builtIndex = path.join(web, "index.html");
+await fs.writeFile(
+  builtIndex,
+  (await fs.readFile(builtIndex, "utf8")).replace(
+    /<title>[^<]*<\/title>/,
+    `<title>nicoSampler · v${version}</title>`,
+  ),
+);
+await fs.writeFile(
+  path.join(web, "src/version.js"),
+  `export const APP_VERSION = ${JSON.stringify(version)};\n`,
+);
 async function walk(dir, prefix = "") {
   const out = [];
   for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
@@ -61,6 +74,7 @@ const assets = (await walk(web))
   .map((e) => "./" + e.name);
 assets.unshift("./");
 let sw = await fs.readFile(path.join(web, "sw.js"), "utf8");
+sw = sw.replace(/const VERSION = "[^"]+"/, `const VERSION = "${version}"`);
 sw = sw.replace(
   /const ASSETS = \[[\s\S]*?\n\];/,
   "const ASSETS = " + JSON.stringify(assets, null, 2) + ";",
@@ -72,7 +86,9 @@ for (const asset of assets) {
   hash.update(await fs.readFile(path.join(web, name || "index.html")));
 }
 // Worker logic changes must also invalidate the offline cache version.
-hash.update(sw.replace(/const CACHE = "[^"]+"/, 'const CACHE = "CONTENT_HASH"'));
+hash.update(
+  sw.replace(/const CACHE = "[^"]+"/, 'const CACHE = "CONTENT_HASH"'),
+);
 const cache = "nicosampler-" + version + "-" + hash.digest("hex").slice(0, 12);
 sw = sw
   .replace(/const CACHE = "[^"]+"/, `const CACHE = "${cache}"`)
@@ -81,6 +97,33 @@ sw = sw
     'k.startsWith("nicosampler-")',
   );
 await fs.writeFile(path.join(web, "sw.js"), sw);
+if (process.env.GITHUB_ACTIONS !== "true") {
+  const preview = path.join(root, "artifacts/iphone-preview");
+  await fs.rm(path.join(preview, "app"), { recursive: true, force: true });
+  await fs.mkdir(preview, { recursive: true });
+  await fs.cp(web, path.join(preview, "app"), { recursive: true });
+  const quote = (value) => "'" + value.replaceAll("'", "'\\''") + "'";
+  for (const [name, args] of [
+    ["Start.command", ""],
+    ["iPhone 12 Pro Max.command", ""],
+    ["iPhone 12 Smaller.command", " --small"],
+  ]) {
+    await fs.writeFile(
+      path.join(preview, name),
+      "#!/bin/sh\nexec " +
+        quote(process.execPath) +
+        " " +
+        quote(path.join(root, "scripts/preview-iphone.mjs")) +
+        args +
+        "\n",
+      { mode: 0o755 },
+    );
+  }
+  await fs.writeFile(
+    path.join(preview, "README.txt"),
+    `Local-only iPhone previews of nicoSampler ${version}.\nStart.command defaults to iPhone 12 Pro Max (428 x 926). iPhone 12 Smaller.command uses 390 x 844. Both can run together; WebKit, touch and coarse-pointer emulation. This simulates layout, not physical iOS hardware or permissions.\n`,
+  );
+}
 const records = [];
 async function archive(name, entries) {
   const data = zip(entries);
