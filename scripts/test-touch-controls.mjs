@@ -86,7 +86,14 @@ try {
     assert.ok(afterOrder.indexOf(beforeOrder[0])>=2,'trusted touch handle moves selected group');
     assert.equal(afterOrder.indexOf(beforeOrder[1]),afterOrder.indexOf(beforeOrder[0])+1,'group order stays stable');
     assert.equal(await page.locator('#sample-table tr.selected').count(),2);
+    await page.waitForFunction(() => !document.body.classList.contains('dragging-samples'));
+    assert.equal(await page.locator('#mobile-select').textContent(), 'Done',
+      'Group drag preserves explicit selection mode');
     await page.locator('#mobile-select').tap();
+    await page.waitForFunction(() => document.querySelector('#mobile-select').textContent === 'Select'
+      && !document.querySelector('#record-open').hidden && !document.querySelector('#record-open').disabled);
+    assert.equal(await page.locator('#sample-table tr.selected').count(),1,
+      'Done collapses selection before opening the recorder');
     await page.locator('#record-open').tap();
     const threshold=page.locator('#threshold-marker');
     const initialThreshold=await threshold.getAttribute('aria-valuenow');
