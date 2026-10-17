@@ -21,7 +21,9 @@ class SamplerProcessor extends AudioWorkletProcessor {
   message(m) {
     try {
       const a = this.engine.api;
-      if (m.type === "inputGain") {
+      if (m.type === "monitor") {
+        a.set_monitor(m.gain);
+      } else if (m.type === "inputGain") {
         this.inputGain =
           10 ** (Math.max(-24, Math.min(24, Number(m.db) || 0)) / 20);
       } else if (m.type === "inputMode") {
@@ -94,7 +96,7 @@ class SamplerProcessor extends AudioWorkletProcessor {
     if (!output?.length) return true;
     const n = output[0].length;
     try {
-      const rendered = this.engine.output(n);
+      const rendered = this.engine.output(n, inputs[0] ?? [], inputs[1] ?? []);
       output[0].set(rendered[0]);
       if (output[1]) output[1].set(rendered[1]);
       const input = inputs[0];

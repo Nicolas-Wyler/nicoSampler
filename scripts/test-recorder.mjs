@@ -262,6 +262,11 @@ try {
             "#recorded-takes-body tr.selected .take-play svg rect",
           ).length === 2,
       );
+      await page.waitForFunction(() => recorderQA.peak() > 0.00001);
+      await page.waitForFunction(() => Number(document.querySelector('#output-meter')
+        .parentElement.getAttribute('aria-valuenow')) > -60);
+      assert.equal(await page.locator('#record-monitor').isChecked(),false,
+        'Take preview is audible/metered through the shared output with live Monitor off');
       await rows.first().locator(".take-play").click();
       await page.waitForFunction(
         () =>

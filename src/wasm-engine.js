@@ -5,6 +5,10 @@ export async function compileEngine() {
   if (!r.ok) throw Error("Audio engine could not be downloaded");
   return WebAssembly.compile(await r.arrayBuffer());
 }
+function copyInput(api, pointer, channel, n) {
+  if (channel)
+    new Float32Array(api.memory.buffer, pointer, n).set(channel.subarray(0, n));
+}
 export class WasmEngine {
   constructor(module, rate = 44100) {
     const instance = new WebAssembly.Instance(module, {});
@@ -81,7 +85,21 @@ export class WasmEngine {
     new Float32Array(this.api.memory.buffer, this.configPtr, 32).set(data);
     this.api.configure(id, this.configPtr);
   }
-  output(n) {
+  output(n, monitorInput = [], auxiliaryInput = []) {
+    copyInput(this.api, this.api.input_left(), monitorInput[0], n);
+    copyInput(
+      this.api,
+      this.api.input_right(),
+      monitorInput[1] ?? monitorInput[0],
+      n,
+    );
+    copyInput(this.api, this.api.auxiliary_left(), auxiliaryInput[0], n);
+    copyInput(
+      this.api,
+      this.api.auxiliary_right(),
+      auxiliaryInput[1] ?? auxiliaryInput[0],
+      n,
+    );
     this.api.render(n);
     return [
       new Float32Array(this.api.memory.buffer, this.api.output_left(), n),

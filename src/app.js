@@ -3788,7 +3788,8 @@ async function previewTakes(entries = takeTable.selected()) {
       gain = audio.context.createGain();
     source.buffer = buffer;
     gain.gain.value = state.master;
-    source.connect(gain).connect(audio.context.destination);
+    source.connect(gain);
+    gain.connect(audio.node, 0, 1);
     takePlayers.set(entry.id, { source, gain });
     source.onended = () => {
       if (takePlayers.get(entry.id)?.source === source)

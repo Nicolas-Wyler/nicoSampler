@@ -94,7 +94,7 @@ export class AudioController {
         new URL("./audio-worklet.js", import.meta.url),
       );
       this.node = new AudioWorkletNode(ctx, "nico-sampler", {
-        numberOfInputs: 1,
+        numberOfInputs: 2,
         numberOfOutputs: 1,
         outputChannelCount: [2],
         processorOptions: { module },
@@ -267,53 +267,77 @@ export class AudioController {
           "No audio shared. Choose a tab with audio and enable Share audio, or use a microphone.",
         );
       }
-    } else
-      stream = await media.getUserMedia({
-        audio: {
-          deviceId: device ? { exact: device } : undefined,
-          channelCount: { ideal: 2 },
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-        },
-        video: false,
-      });
+    } else {
+      this.setCaptureSession(true);
+      try {
+        stream = await media.getUserMedia({
+          audio: {
+            deviceId: device ? { exact: device } : undefined,
+            channelCount: { ideal: 2 },
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+          },
+          video: false,
+        });
+      } catch (error) {
+        this.setCaptureSession(false);
+        throw error;
+      }
+    }
     this.stream = stream;
-    this.input = this.context.createMediaStreamSource(stream);
-    this.input.connect(this.node);
-    this.setInputMonitoring(
-      this.inputMonitoringWanted,
-      this.inputMonitoringDb ?? 0,
-      this.inputMonitoringMaster ?? 1,
-    );
+    try {
+      this.input = this.context.createMediaStreamSource(stream);
+      this.input.connect(this.node);
+      this.setInputMonitoring(
+        this.inputMonitoringWanted,
+        this.inputMonitoringDb ?? 0,
+        this.inputMonitoringMaster ?? 1,
+      );
+    } catch (error) {
+      this.input?.disconnect();
+      this.input = null;
+      for (const track of stream.getTracks()) track.stop();
+      this.stream = null;
+      this.setCaptureSession(false);
+      throw error;
+    }
     for (const track of stream.getAudioTracks())
       track.onended = () => {
         this.send({ type: "recordStop" });
+        if (stream.getAudioTracks().every((t) => t.readyState === "ended"))
+          this.setCaptureSession(false);
         this.onEvent({ type: "inputEnded" });
       };
     return (await media.enumerateDevices().catch(() => [])).filter(
       (d) => d.kind === "audioinput",
     );
   }
+  setCaptureSession(capturing) {
+    const nav = globalThis.navigator;
+    const ios =
+      /iPhone|iPad|iPod/.test(nav?.userAgent ?? "") ||
+      (nav?.platform === "MacIntel" && nav?.maxTouchPoints > 1);
+    if (!ios || !nav?.audioSession) return;
+    if (!capturing && !this.captureSessionActive) return;
+    try {
+      nav.audioSession.type = capturing ? "play-and-record" : "playback";
+      this.captureSessionActive = capturing;
+    } catch {
+      /* Unsupported session policies must not block playback/capture. */
+    }
+  }
   setInputMonitoring(enabled, db = 0, master = 1) {
     this.inputMonitoringWanted = Boolean(enabled);
     this.inputMonitoringDb = db;
     this.inputMonitoringMaster = master;
-    if (!this.input || !this.context) return;
-    if (!this.monitorOutput && !enabled) return;
-    if (!this.monitorOutput) {
-      this.monitorOutput = this.context.createGain();
-      this.input.connect(this.monitorOutput);
-      this.monitorOutput.connect(this.context.destination);
-    }
-    this.monitorOutput.gain.setValueAtTime(
-      enabled ? Math.pow(10, db / 20) * master : 0,
-      this.context.currentTime,
-    );
+    this.send({
+      type: "monitor",
+      gain: enabled && this.input ? Math.pow(10, db / 20) * master : 0,
+    });
   }
   async disconnectInput() {
-    this.monitorOutput?.disconnect();
-    this.monitorOutput = null;
+    this.send({ type: "monitor", gain: 0 });
     this.input?.disconnect();
     this.input = null;
     if (this.stream) {
@@ -323,6 +347,7 @@ export class AudioController {
       }
       this.stream = null;
     }
+    this.setCaptureSession(false);
   }
   forget(id) {
     this.prepared.delete(id);

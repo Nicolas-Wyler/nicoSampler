@@ -93,3 +93,7 @@ The main MIDI channel selector is hidden when Input is None or PC Keyboard. Reco
 When two or more imported audio files or sample containers have no key assignment, the sampler asks whether to auto-assign them or keep them unassigned. Auto assignment chooses an ascending, collision-free block near the piano's visible center. With PC Keyboard input, the block stays inside the current playable keyboard range. If no block fits, free some keys/change octave or load unassigned. Container assignments are preserved and reserve their full spread ranges; existing-key collisions use the normal Override/Multi-assign/Cancel prompt. File-name order determines the rising key order. This applies to both the file picker and drops; browser-supported MP3 and other audio files can also be dropped on the landing screen/table.
 
 Sample and Level are pinned at the edges during horizontal scrolling, with opaque backgrounds and thin dividers around the scrollable columns.
+
+## Output level
+
+The Out meter shows final digital audio after Master and peak protection, including recorded-take audition and audible input monitoring. Full scale is 0 dBFS (maximum digital sample level); device volume controls how loudly that output plays. Red warns of high signal level and does not itself mean clipping. Lower Master or sample levels to leave mixing headroom. The stereo-linked limiter protects sample peaks with a 50 ms hold and 150 ms release; it does not normalize average loudness or repair distortion already present in a sample.

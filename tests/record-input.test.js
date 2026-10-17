@@ -12,6 +12,7 @@ function setup() {
   return {
     calls,
     setInputMonitoring: AudioController.prototype.setInputMonitoring,
+    setCaptureSession: AudioController.prototype.setCaptureSession,
     disconnectInput: async () => {
       calls.push("disconnect");
     },
@@ -21,6 +22,7 @@ function setup() {
     context: {
       createMediaStreamSource: () => ({
         connect: () => calls.push("connected"),
+        disconnect: () => calls.push("source-disconnected"),
       }),
     },
     node: {},
@@ -106,31 +108,58 @@ test("microphone input uses the chosen device and enumeration errors do not brea
   assert.equal(controller.stream, stream);
 });
 
-test("audible input monitoring stays disconnected by default, applies gain only on request and tears down", async () => {
-  const links = [],
-    values = [];
-  const gain = {
-    gain: { setValueAtTime: (v, t) => values.push([v, t]) },
-    connect: (n) => links.push(n),
-    disconnect: () => links.push("disconnect monitor"),
+test("audible monitor joins the protected worklet mix, applies Master/gain, and tears down", async () => {
+  const messages=[],links=[];
+  const controller={
+    input:{disconnect:()=>links.push("disconnected")},stream:null,
+    setCaptureSession: AudioController.prototype.setCaptureSession,
+    send:message=>messages.push(message),
+    context:{createGain:()=>{throw Error("Monitor must not bypass the protected worklet output");}},
   };
-  const controller = {
-    input: {
-      connect: (n) => links.push(n),
-      disconnect: () => links.push("disconnect input"),
-    },
-    context: { currentTime: 2, destination: {}, createGain: () => gain },
-    stream: null,
-  };
-  AudioController.prototype.setInputMonitoring.call(controller, false);
-  assert.equal(links.length, 0);
-  AudioController.prototype.setInputMonitoring.call(controller, true, -6);
-  assert.equal(links.length, 2);
-  assert.ok(Math.abs(values[0][0] - Math.pow(10, -6 / 20)) < 1e-8);
-  AudioController.prototype.setInputMonitoring.call(controller, false);
-  assert.equal(values.at(-1)[0], 0);
+  AudioController.prototype.setInputMonitoring.call(controller,false);
+  assert.deepEqual(messages.at(-1),{type:"monitor",gain:0});
+  AudioController.prototype.setInputMonitoring.call(controller,true,-6,.5);
+  assert.ok(Math.abs(messages.at(-1).gain-Math.pow(10,-6/20)*.5)<1e-8);
+  AudioController.prototype.setInputMonitoring.call(controller,false);
+  assert.equal(messages.at(-1).gain,0);
   await AudioController.prototype.disconnectInput.call(controller);
-  assert.equal(controller.monitorOutput, null);
-  assert.equal(controller.input, null);
-  assert.ok(links.includes("disconnect monitor"));
+  assert.equal(controller.input,null);
+  assert.equal(messages.at(-1).gain,0);
+  assert.deepEqual(links,["disconnected"]);
+});
+
+function mockIosSession() {
+ const changes=[];
+ Object.defineProperty(navigator,'userAgent',{configurable:true,value:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_3 like Mac OS X)'});
+ Object.defineProperty(navigator,'audioSession',{configurable:true,value:{set type(value){changes.push(value);}}});
+ return changes;
+}
+test('iOS capture session changes only around capture and restores playback after stopped tracks',async()=>{
+ const changes=mockIosSession(),track={readyState:'live',stop(){this.readyState='ended';changes.push('track-stopped');}},stream={getAudioTracks:()=>[track],getTracks:()=>[track]};
+ mockMedia({getUserMedia:async()=>stream,enumerateDevices:async()=>[]});
+ const c=setup();
+ AudioController.prototype.setCaptureSession.call(c,false);assert.deepEqual(changes,[],'initial playback policy unchanged');
+ await AudioController.prototype.connectInput.call(c,'mic','','Stereo');
+ assert.deepEqual(changes,['play-and-record']);
+ await AudioController.prototype.disconnectInput.call(c);
+ assert.deepEqual(changes,['play-and-record','track-stopped','playback']);
+});
+test('iOS capture denial restores playback without changing microphone-free startup',async()=>{
+ const changes=mockIosSession();mockMedia({getUserMedia:async()=>{throw new DOMException('Denied','NotAllowedError');}});
+ await assert.rejects(AudioController.prototype.connectInput.call(setup(),'mic','','Stereo'),/Denied/);
+ assert.deepEqual(changes,['play-and-record','playback']);
+});
+test('ending all iOS microphone tracks restores playback session',async()=>{
+ const changes=mockIosSession(),track={readyState:'live',stop(){}},stream={getAudioTracks:()=>[track],getTracks:()=>[track]};
+ mockMedia({getUserMedia:async()=>stream,enumerateDevices:async()=>[]});const c=setup();
+ await AudioController.prototype.connectInput.call(c,'mic','','Stereo');track.readyState='ended';track.onended();
+ assert.deepEqual(changes,['play-and-record','playback']);
+});
+test('iOS capture setup failure stops granted tracks and restores playback session',async()=>{
+ const changes=mockIosSession(),track={stopped:false,stop(){this.stopped=true;}},stream={getAudioTracks:()=>[track],getTracks:()=>[track]};
+ mockMedia({getUserMedia:async()=>stream,enumerateDevices:async()=>[]});const c=setup();
+ c.context.createMediaStreamSource=()=>{throw Error('Context closed during permission prompt');};
+ await assert.rejects(AudioController.prototype.connectInput.call(c,'mic','','Stereo'),/Context closed/);
+ assert.equal(track.stopped,true,'granted stream cannot leak when node setup fails');
+ assert.deepEqual(changes,['play-and-record','playback']);
 });

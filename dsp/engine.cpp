@@ -11,6 +11,10 @@ using std::min;
 static constexpr int MAX_SAMPLES = 513, MAX_VOICES = 128, MAX_FRAMES = 2048;
 static float rate = 44100, master = 1.f, peak = 0;
 static float outL[MAX_FRAMES], outR[MAX_FRAMES];
+static float inputL[MAX_FRAMES], inputR[MAX_FRAMES], auxL[MAX_FRAMES],
+    auxR[MAX_FRAMES], monitorGain = 0;
+static float limiterEnvelope = 0, limiterRelease = 0, meterRelease = 0;
+static int limiterHold = 0, limiterHoldFrames = 0;
 static int voiceLimit = 64;
 static inline float clamp(float v, float a, float b) {
   return max(a, min(b, v));
@@ -148,8 +152,20 @@ API int allocate(int bytes) {
 API void deallocate(int p) { free((void *)(uintptr_t)p); }
 API int output_left() { return (int)(uintptr_t)outL; }
 API int output_right() { return (int)(uintptr_t)outR; }
+API int input_left() { return (int)(uintptr_t)inputL; }
+API int input_right() { return (int)(uintptr_t)inputR; }
+API int auxiliary_left() { return (int)(uintptr_t)auxL; }
+API int auxiliary_right() { return (int)(uintptr_t)auxR; }
+API void set_monitor(float gain) {
+  monitorGain = std::isfinite(gain) ? clamp(gain, 0, 16) : 0;
+}
 API void init(float sampleRate) {
   rate = clamp(sampleRate, 8000, 192000);
+  limiterRelease = std::exp(-1.f / (.150f * rate));
+  meterRelease = std::exp(-1.f / (.250f * rate));
+  limiterHoldFrames = int(.050f * rate);
+  limiterEnvelope = 0;
+  limiterHold = 0;
   delays[0].init(4);
   delays[1].init(2);
 }
@@ -173,6 +189,8 @@ API void panic() {
   delays[0].clear();
   delays[1].clear();
   peak = 0;
+  limiterEnvelope = 0;
+  limiterHold = 0;
 }
 API void remove_sample(int id) {
   if (id < 0 || id >= MAX_SAMPLES)
@@ -246,8 +264,10 @@ API void configure(int id, int ptr) {
   s.mono = (int(p[31]) & 1) != 0;
   s.monoChannel = (int(p[31]) & 4) ? 1 : (int(p[31]) & 8) ? 2 : 0;
   s.muted = (int(p[31]) & 2) != 0;
-  s.panLeft = s.pan == 0 ? 1.f : 1.41421356237f * cosf((s.pan + 1) * .785398163397f);
-  s.panRight = s.pan == 0 ? 1.f : 1.41421356237f * sinf((s.pan + 1) * .785398163397f);
+  s.panLeft =
+      s.pan == 0 ? 1.f : 1.41421356237f * cosf((s.pan + 1) * .785398163397f);
+  s.panRight =
+      s.pan == 0 ? 1.f : 1.41421356237f * sinf((s.pan + 1) * .785398163397f);
 }
 API void prepare(int id) {
   if (id < 0 || id >= MAX_SAMPLES)
@@ -410,7 +430,6 @@ API void render(int frames) {
   for (auto &v : voices)
     if (v.active)
       updateFilter(v, samples[v.sample], frames);
-  float blockPeak = 0;
   for (int frame = 0; frame < frames; frame++) {
     float dry[2] = {}, bus1[4] = {}, bus2[2] = {};
     for (auto &v : voices) {
@@ -459,9 +478,13 @@ API void render(int frames) {
         if (s.mono) {
           if (s.monoChannel) {
             int channel = s.monoChannel - 1;
-            x = (s.data[left * 2 + channel] * (1 - f) + s.data[right * 2 + channel] * f) * gain;
-          } else x = (s.data[left * 2] * (1 - f) + s.data[right * 2] * f +
-               s.data[left * 2 + 1] * (1 - f) + s.data[right * 2 + 1] * f) * .5f * gain;
+            x = (s.data[left * 2 + channel] * (1 - f) +
+                 s.data[right * 2 + channel] * f) *
+                gain;
+          } else
+            x = (s.data[left * 2] * (1 - f) + s.data[right * 2] * f +
+                 s.data[left * 2 + 1] * (1 - f) + s.data[right * 2 + 1] * f) *
+                .5f * gain;
         }
         float y = v.b0 * x + v.z1[c];
         v.z1[c] = v.b1 * x - v.a1 * y + v.z2[c];
@@ -471,7 +494,8 @@ API void render(int frames) {
           v.z1[c] = v.z2[c] = 0;
         }
         y *= c == 0 ? s.panLeft : s.panRight;
-        if (s.muted) y = 0;
+        if (s.muted)
+          y = 0;
         dry[c] += y;
         bus1[c] += y * s.fx1;
         bus1[c + 2] += y * s.fx1 * s.fx2;
@@ -489,26 +513,34 @@ API void render(int frames) {
     bus2[0] += wet1[2];
     bus2[1] += wet1[3];
     delays[1].process(bus2, wet2);
-    float l = (dry[0] + wet1[0] + wet2[0]) * master,
-          r = (dry[1] + wet1[1] + wet2[1]) * master;
-    // Discard non-finite values before the Python-compatible block limiter.
+    float l = (dry[0] + wet1[0] + wet2[0]) * master +
+              inputL[frame] * monitorGain + auxL[frame],
+          r = (dry[1] + wet1[1] + wet2[1]) * master +
+              inputR[frame] * monitorGain + auxR[frame];
+    // Consume each input quantum once; idle playback needs no JS input views.
+    inputL[frame] = inputR[frame] = auxL[frame] = auxR[frame] = 0;
     if (!std::isfinite(l))
       l = 0;
     if (!std::isfinite(r))
       r = 0;
-    outL[frame] = l;
-    outR[frame] = r;
-    blockPeak = max(blockPeak, max(std::abs(l), std::abs(r)));
-  }
-  // Match the Python sampler: scale the complete output quantum to .95 peak.
-  if (blockPeak > .95f) {
-    const float gain = .95f / blockPeak;
-    for (int i = 0; i < frames; i++) {
-      outL[i] *= gain;
-      outR[i] *= gain;
+    // Stereo-linked, sample-accurate peak protection. Hold low-frequency peaks
+    // and release smoothly rather than changing gain at callback boundaries.
+    const float magnitude = max(std::abs(l), std::abs(r));
+    if (magnitude >= limiterEnvelope) {
+      limiterEnvelope = magnitude;
+      limiterHold = limiterHoldFrames;
+    } else if (limiterHold > 0) {
+      --limiterHold;
+    } else {
+      limiterEnvelope = max(magnitude, limiterEnvelope * limiterRelease);
     }
+    const float gain = limiterEnvelope > 1.f ? 1.f / limiterEnvelope : 1.f;
+    outL[frame] = clamp(l * gain, -1.f, 1.f);
+    outR[frame] = clamp(r * gain, -1.f, 1.f);
+    // Meter the final protected stream, including audible input monitoring.
+    peak = max(max(std::abs(outL[frame]), std::abs(outR[frame])),
+               peak * meterRelease);
   }
-  peak = max(blockPeak, peak * .94f);
 }
 API int processed_pointer(int id) {
   return id >= 0 && id < MAX_SAMPLES ? (int)(uintptr_t)samples[id].data : 0;

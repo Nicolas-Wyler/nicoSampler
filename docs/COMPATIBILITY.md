@@ -31,3 +31,5 @@ MIDI permission is checked at startup where supported: existing grants reconnect
 iPhone piano views are limited to two visible octaves at their widest zoom; scrolling still reaches all notes. Automated phone audio/zoom checks run in desktop WebKit with touch emulation; they do not certify physical iOS 18.3 audio routing or silent-switch behavior.
 
 On iPhone the piano uses explicit Play/Move modes. Safari has no keyboard attach/detach event: PC range hints are enabled after trusted key use outside editable fields and reset when leaving the app. This is usage detection, not hardware detection. Piano resize grips stay visible when folded, allowing a drag to reopen it; the height is bounded to half the window.
+
+On supported iOS Audio Session implementations, microphone capture requests play-and-record and releases it back to playback after capture ends or fails. This addresses the documented WebKit low-output-volume lifecycle; it is guarded on unsupported browsers. Physical iPhone 12 Pro Max/iOS 18.3 loudness and routing still require device verification.
