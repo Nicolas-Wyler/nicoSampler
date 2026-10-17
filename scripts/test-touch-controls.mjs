@@ -43,7 +43,7 @@ try {
           const b=document.querySelector('#mobile-select');
           const r=document.querySelector('#record-open');
           touchControlTrace.push({time:Math.round(performance.now()),type,target:e.target.closest?.('button')?.id || e.target.closest?.('[data-id]')?.dataset.id || e.target.className,
-            trusted:e.isTrusted,pointer:e.pointerType,id:e.pointerId,touches:e.touches?.length,
+            trusted:e.isTrusted,pointer:e.pointerType,id:e.pointerId,primary:e.isPrimary,touches:e.touches?.length,
             done:b.textContent,selected:document.querySelectorAll('#sample-table tr.selected').length,
             recordHidden:r.hidden,recordDisabled:r.disabled,scroll:document.querySelector('#table-wrap').scrollTop});
           if(touchControlTrace.length>100)touchControlTrace.shift();
@@ -144,10 +144,24 @@ try {
     await gesture(page.locator('.record-meter'),{dx:35});
     assert.notEqual(await threshold.getAttribute('aria-valuenow'),initialThreshold,'horizontal meter swipe adjusts threshold');
     await page.locator('#record-close').tap();
+    await page.locator('#record-dialog').waitFor({state:'hidden'});
     console.log('Threshold trusted vertical/horizontal touch guard PASS');
     const master=page.locator('#master-knob');
     await gesture(master);
-    assert.equal(await page.locator('#sampler-settings').isVisible(),true,'Master tap opens settings');
+    try {
+      // Native compatibility clicks can be delivered after pointer-up; the
+      // runtime deliberately opens the modal from that click, not pointer-up.
+      await page.locator('#sampler-settings').waitFor({state:'visible',timeout:5000});
+    } catch(error) {
+      console.error('MASTER TOUCH FAILURE',JSON.stringify(await page.evaluate(()=>({
+        trace:touchControlTrace,master:document.querySelector('#master-knob').outerHTML,
+        masterRect:document.querySelector('#master-knob').getBoundingClientRect().toJSON(),
+        settings:document.querySelector('#sampler-settings').outerHTML.slice(0,300),
+        active:document.activeElement?.outerHTML
+      }))));
+      await page.screenshot({path:'/tmp/nicosampler-master-touch-failure.png'});
+      throw error;
+    }
     await page.locator('#sampler-settings-close').tap();
     const masterBefore=await page.locator('#master').inputValue();
     await gesture(master,{hold:420,dy:-25});
