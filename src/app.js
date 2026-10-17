@@ -4064,6 +4064,22 @@ async function boot() {
       localStorage.getItem("nico-rack-view") === "table" ? "table" : "pads";
   } catch {}
   paint();
+  // Project launchers can open the browser sampler with a same-origin or
+  // localhost URL to a native .sampler.zip bundle.  This keeps conversion and
+  // playback in the GitHub sampler format; the helper only serves the bundle.
+  const launchUrl = new URLSearchParams(location.search).get("projectUrl");
+  if (launchUrl) {
+    try {
+      const response = await fetch(launchUrl, { cache: "no-store" });
+      if (!response.ok) throw Error(`Project download failed (${response.status})`);
+      const blob = await response.blob();
+      const name = decodeURIComponent(launchUrl.split("/").pop() || "project.sampler.zip");
+      await importLanding([new File([blob], name, { type: "application/zip" })]);
+      history.replaceState({}, "", location.pathname);
+    } catch (error) {
+      report(Error("The browser sampler could not load this project: " + error.message));
+    }
+  }
   try {
     const saved = await loadRecovery();
     if (saved) {
