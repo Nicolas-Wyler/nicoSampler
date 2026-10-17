@@ -541,7 +541,7 @@ tfoot .add-sample-row td {
   box-shadow: inset 1px 0 var(--line);
 }
 #table-wrap {
-  overscroll-behavior-x: none;
+  overscroll-behavior-x: contain;
   isolation: isolate;
 }
 #sample-table.selection-mode tr:not(.selected) td:first-child,

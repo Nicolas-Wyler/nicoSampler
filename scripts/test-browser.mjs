@@ -45,10 +45,19 @@ try {
     const midiPage = await browser.newPage();
     try {
       await midiPage.addInitScript(() => {
-        window.midiQA = { calls: [], access: { inputs: new Map() } };
+        window.midiQA = { calls: [], access: { inputs: new Map() }, notes: [], deny: true };
+        const post = MessagePort.prototype.postMessage;
+        MessagePort.prototype.postMessage = function (message, ...args) {
+          if (message?.type === "on") midiQA.notes.push(message.note);
+          return post.call(this, message, ...args);
+        };
         Object.defineProperty(navigator, "requestMIDIAccess", {
           configurable: true,
-          value: async () => { midiQA.calls.push("midi"); return midiQA.access; },
+          value: async () => {
+            midiQA.calls.push("midi");
+            if (midiQA.deny) throw new DOMException("Fixture permission denied", "NotAllowedError");
+            return midiQA.access;
+          },
         });
         const C = window.AudioContext || window.webkitAudioContext;
         const resume = C.prototype.resume;
@@ -60,10 +69,22 @@ try {
       await midiPage.goto(origin);
       await midiPage.addStyleTag({ content: "#offline-status{display:none!important}" });
       await midiPage.locator("#landing-new").click();
+      await midiPage.locator("#input-source").selectOption("None", { force: true });
       await midiPage.locator("#connect-midi").click();
       await midiPage.waitForFunction(() => !document.querySelector("#toast").hidden
-        && document.querySelector("#toast").textContent.includes("No MIDI device found"));
-      assert.equal(await midiPage.locator("#input-routing-label").isVisible(), false);
+        && document.querySelector("#toast").textContent.includes("MIDI permission was denied"));
+      assert.equal(await midiPage.locator("#input-routing-label").isVisible(), true,
+        "Input choices remain accessible even when external MIDI permission is denied");
+      assert.equal(await midiPage.locator("#input-source").inputValue(), "None",
+        "Permission denial preserves the explicit None routing choice");
+      assert.ok(await midiPage.locator('#input-source option[value="PC Keyboard"]').count());
+      await midiPage.evaluate(() => { midiQA.deny = false; });
+      await midiPage.locator("#connect-midi").click();
+      await midiPage.waitForFunction(() => !document.querySelector("#toast").hidden
+        && document.querySelector("#toast").textContent.includes("No external MIDI device"));
+      assert.equal(await midiPage.locator("#input-routing-label").isVisible(), true,
+        "Explicit Connect exposes built-in PC Keyboard even without external MIDI");
+      assert.ok(await midiPage.locator('#input-source option[value="PC Keyboard"]').count());
       assert.equal(await midiPage.locator("#connect-midi").isVisible(), true);
       assert.equal((await midiPage.evaluate(() => midiQA.calls))[0], "midi",
         "MIDI permission is requested before audio startup");
@@ -73,13 +94,33 @@ try {
       });
       await midiPage.waitForFunction(() => !document.querySelector("#input-routing-label").hidden);
       assert.equal(await midiPage.locator("#connect-midi").isVisible(), false);
+      await midiPage.locator("#input-source").selectOption("qa-midi");
       await midiPage.evaluate(() => {
         midiQA.access.inputs.get("qa-midi").state = "disconnected";
         midiQA.access.onstatechange();
       });
-      await midiPage.waitForFunction(() => document.querySelector("#input-routing-label").hidden);
+      assert.equal(await midiPage.locator("#input-routing-label").isVisible(), true);
+      assert.equal(await midiPage.locator("#input-source").inputValue(), "qa-midi",
+        "Disconnected external routing remains selected until explicit user choice");
       assert.equal(await midiPage.locator("#connect-midi").isVisible(), true);
-      console.log(`${name}: MIDI empty-device feedback, request order and hotplug passed`);
+      await midiPage.locator("#load-kind").selectOption("example");
+      await midiPage.waitForFunction(() => document.querySelector("#sample-count").textContent === "16");
+      await midiPage.locator("#input-source").selectOption("qa-midi");
+      await midiPage.locator("#load-kind").blur();
+      await midiPage.evaluate(() => { midiQA.notes.length = 0; });
+      await midiPage.keyboard.press("a");
+      await midiPage.waitForTimeout(100);
+      assert.equal(await midiPage.evaluate(() => midiQA.notes.length), 0,
+        "Disconnected external input does not silently enable PC notes");
+      await midiPage.locator("#input-source").selectOption("PC Keyboard");
+      await midiPage.locator("#input-source").blur();
+      await midiPage.keyboard.down("a");
+      await midiPage.waitForFunction(() => midiQA.notes.length > 0);
+      await midiPage.waitForFunction(() => Number(document.querySelector("#output-meter")
+        .parentElement.getAttribute("aria-valuenow")) > -60);
+      await midiPage.keyboard.up("a");
+      assert.equal(await midiPage.locator("#midi-channel-label").isVisible(), false);
+      console.log(`${name}: MIDI zero-device PC recovery, request order, hotplug and real typing playback passed`);
     } finally { await midiPage.close(); }
     const page = await browser.newPage({
       viewport: { width: 1280, height: 800 },

@@ -2887,12 +2887,13 @@ document.addEventListener("drop", (e) => {
 });
 // MIDI follows device hotplug, channel filtering and velocity-zero note-off convention.
 let midi = null;
+let midiRoutingRequested = false;
 function refreshMidi() {
-  const inputs = [...midi.inputs.values()].filter(
+  const inputs = [...(midi?.inputs.values() ?? [])].filter(
     (input) => input.state !== "disconnected",
   );
   const connected = inputs.length > 0;
-  $("input-routing-label").hidden = !connected;
+  $("input-routing-label").hidden = !connected && !midiRoutingRequested;
   $("midi-channel-label").hidden =
     !connected ||
     ["None", "PC Keyboard"].includes(state.source ?? "PC Keyboard");
@@ -2926,9 +2927,7 @@ function refreshMidi() {
   if (![...$("input-source").options].some((o) => o.value === value))
     $("input-source").append(option(value, "Saved MIDI input (disconnected)"));
   $("input-source").value = value;
-  $("midi-status").textContent = connected
-    ? ""
-    : "No MIDI device found. Check its USB/Bluetooth connection, then reconnect.";
+  $("midi-status").textContent = connected ? "" : "No external MIDI device";
   syncControls();
 }
 listen("connect-midi", "click", async () => {
@@ -2936,6 +2935,11 @@ listen("connect-midi", "click", async () => {
     throw Error(
       "Native MIDI is unavailable here. Use Chrome/Edge on macOS or Windows, or play with touch/keyboard.",
     );
+  // An explicit connect action also exposes PC Keyboard/None without hardware.
+  // Keep the saved routing choice until the user changes it.
+  midiRoutingRequested = true;
+  refreshMidi();
+  // Local input choices do not depend on granting external MIDI permission.
   // Request access directly in the click gesture, independently of audio startup.
   try {
     midi = await navigator.requestMIDIAccess({ sysex: false });
@@ -2954,11 +2958,12 @@ listen("connect-midi", "click", async () => {
   if (
     ![...midi.inputs.values()].some((input) => input.state !== "disconnected")
   ) {
-    status(
-      "No MIDI device found. Check its USB/Bluetooth connection, then reconnect.",
-    );
-    $("toast").textContent =
-      "No MIDI device found. Check its USB/Bluetooth connection, then reconnect.";
+    const message =
+      state.source === "PC Keyboard"
+        ? "PC Keyboard is ready. No external MIDI device is connected."
+        : "No external MIDI device is connected. Choose PC Keyboard in Input to play with your computer keys.";
+    status(message);
+    $("toast").textContent = message;
     $("toast").hidden = false;
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => ($("toast").hidden = true), 8000);
