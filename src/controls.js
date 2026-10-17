@@ -290,7 +290,7 @@ function syncScrollbars() {
       continue;
     }
     const coarse = matchMedia("(pointer: coarse)").matches;
-    const thickness = coarse ? 10 : 8;
+    const thickness = ((coarse ? 10 : 8) * 2) / 3;
     const hasX = element.scrollWidth > element.clientWidth + 1;
     const hasY = element.scrollHeight > element.clientHeight + 1;
     // The table owns its right lane; ordinary scrollers reserve padding for tracks.

@@ -767,7 +767,9 @@ export class ClassicUI {
     this.widths = this.minimumWidths.map((width, i) =>
       LOCKED_COLUMNS.has(i)
         ? fixedColumnWidth(i)
-        : Math.max(width, this.manualWidths.get(i) ?? 0),
+        : this.manualWidths.has(i)
+          ? Math.max(i === 0 ? 116 : 45, this.manualWidths.get(i))
+          : width,
     );
     const wrap = document.getElementById("table-wrap"),
       wrapStyle = getComputedStyle(wrap);
@@ -798,7 +800,11 @@ export class ClassicUI {
       });
     const remaining =
       available - this.widths.reduce((sum, width) => sum + width, 0);
-    if (remaining > 0) this.widths[0] += remaining;
+    if (remaining > 0) {
+      // A user-sized Sample column must not be expanded again by panel fitting.
+      // Keep rows panel-wide by assigning spare room to the envelope preview.
+      this.widths[this.manualWidths.has(0) ? 1 : 0] += remaining;
+    }
     this.applyWidths();
   }
   restoreWidths(widths, manualWidths) {
@@ -832,8 +838,8 @@ export class ClassicUI {
     const gutter =
       wrap.scrollHeight > wrap.clientHeight + 1
         ? matchMedia("(pointer: coarse)").matches
-          ? 11
-          : 9
+          ? (10 * 2) / 3 + 1
+          : (8 * 2) / 3 + 1
         : 0;
     wrap.style.setProperty("--sample-scroll-gutter", gutter + "px");
     // Measure intrinsic content, never the stretched width of a full-cell control.

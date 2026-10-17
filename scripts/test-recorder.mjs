@@ -41,6 +41,12 @@ try {
       await page.addInitScript(() => {
         const C = window.AudioContext || window.webkitAudioContext;
         window.recorderQA = { requests: 0, streams: [], analysers: [] };
+        // Recorder transport tests use a stable reported output latency. The
+        // separate input-monitor tests exercise latency-rise auto-disconnection.
+        for (const property of ["baseLatency", "outputLatency"])
+          Object.defineProperty(C.prototype, property, {
+            configurable: true, get: () => 0.01,
+          });
         const ctx = new C(),
           source = ctx.createOscillator(),
           amplitude = ctx.createGain();
@@ -194,7 +200,15 @@ try {
       assert((await peak()) < 1e-7, "Monitor off silences the output path");
       for (let i = 1; i <= 3; i++) {
         await page.locator("#record-start").click();
+        await page.locator("#record-stop").waitFor({ state: "visible" });
         await page.waitForTimeout(900);
+        assert.ok(await page.locator("#record-stop").isVisible(),
+          "Recording unexpectedly stopped: " + JSON.stringify(await page.evaluate(() => ({
+            status: document.querySelector("#record-status").textContent,
+            message: document.querySelector("#status")?.textContent,
+            monitor: document.querySelector("#input-monitor").getAttribute("aria-pressed"),
+            takes: document.querySelectorAll("#recorded-takes-body [data-take-id]").length,
+          }))));
         await page.locator("#record-stop").click();
         await page.waitForFunction(
           (n) =>

@@ -531,15 +531,44 @@ tfoot .add-sample-row td {
   padding-bottom: 7px;
 }
 
-#sample-grid th:first-child {position:sticky;left:0;z-index:4;box-shadow:inset -1px 0 var(--line);}
-#sample-grid th.level-cell {box-shadow:inset 1px 0 var(--line);}
-#table-wrap {overscroll-behavior-x:none;isolation:isolate;}
+#sample-grid th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  box-shadow: inset -1px 0 var(--line);
+}
+#sample-grid th.level-cell {
+  box-shadow: inset 1px 0 var(--line);
+}
+#table-wrap {
+  overscroll-behavior-x: none;
+  isolation: isolate;
+}
 #sample-table.selection-mode tr:not(.selected) td:first-child,
-#sample-table.selection-mode tr:not(.selected) td.level-cell {opacity:1;}
+#sample-table.selection-mode tr:not(.selected) td.level-cell {
+  opacity: 1;
+}
 #sample-table.selection-mode tr:not(.selected) td:first-child > *,
-#sample-table.selection-mode tr:not(.selected) td.level-cell > * {opacity:.4;}
+#sample-table.selection-mode tr:not(.selected) td.level-cell > * {
+  opacity: 0.4;
+}
 
 /* WebKit cannot pin a table cell whose own display type is flex. */
-#sample-table td:first-child {display:table-cell;}
-#sample-table .sample-cell-content {display:flex;align-items:center;gap:4px;min-width:0;}
-#sample-table.selection-mode tr.selected td > .sample-cell-content {opacity:1;}
+#sample-table td:first-child {
+  display: table-cell;
+}
+#sample-table .sample-cell-content {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+#sample-table.selection-mode tr.selected td > .sample-cell-content {
+  opacity: 1;
+}
+
+/* The reserved scrollbar lane must never reveal cells behind pinned Level.
+   Scrollbar controls live outside this scrolling element. */
+#table-wrap {
+  clip-path: inset(0 var(--sample-scroll-gutter, 0px) 0 0);
+}

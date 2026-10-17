@@ -41,6 +41,46 @@ try {
         ? { executablePath: process.env.CHROME_PATH }
         : {}),
     });
+    // MIDI permission/discovery must be independent of audio startup.
+    const midiPage = await browser.newPage();
+    try {
+      await midiPage.addInitScript(() => {
+        window.midiQA = { calls: [], access: { inputs: new Map() } };
+        Object.defineProperty(navigator, "requestMIDIAccess", {
+          configurable: true,
+          value: async () => { midiQA.calls.push("midi"); return midiQA.access; },
+        });
+        const C = window.AudioContext || window.webkitAudioContext;
+        const resume = C.prototype.resume;
+        C.prototype.resume = function () {
+          midiQA.calls.push("audio");
+          return resume.call(this);
+        };
+      });
+      await midiPage.goto(origin);
+      await midiPage.addStyleTag({ content: "#offline-status{display:none!important}" });
+      await midiPage.locator("#landing-new").click();
+      await midiPage.locator("#connect-midi").click();
+      await midiPage.waitForFunction(() => !document.querySelector("#toast").hidden
+        && document.querySelector("#toast").textContent.includes("No MIDI device found"));
+      assert.equal(await midiPage.locator("#input-routing-label").isVisible(), false);
+      assert.equal(await midiPage.locator("#connect-midi").isVisible(), true);
+      assert.equal((await midiPage.evaluate(() => midiQA.calls))[0], "midi",
+        "MIDI permission is requested before audio startup");
+      await midiPage.evaluate(() => {
+        midiQA.access.inputs.set("qa-midi", { id: "qa-midi", name: "QA MIDI", state: "connected" });
+        midiQA.access.onstatechange();
+      });
+      await midiPage.waitForFunction(() => !document.querySelector("#input-routing-label").hidden);
+      assert.equal(await midiPage.locator("#connect-midi").isVisible(), false);
+      await midiPage.evaluate(() => {
+        midiQA.access.inputs.get("qa-midi").state = "disconnected";
+        midiQA.access.onstatechange();
+      });
+      await midiPage.waitForFunction(() => document.querySelector("#input-routing-label").hidden);
+      assert.equal(await midiPage.locator("#connect-midi").isVisible(), true);
+      console.log(`${name}: MIDI empty-device feedback, request order and hotplug passed`);
+    } finally { await midiPage.close(); }
     const page = await browser.newPage({
       viewport: { width: 1280, height: 800 },
     });
@@ -85,6 +125,27 @@ try {
         );
         return hit?.closest(".knob") === dial.closest(".knob");
       });
+      // Manual Sample widths are authoritative even when the panel has spare room.
+      const sampleDivider = page.getByRole("separator", { name: "Resize Sample", exact: true });
+      const sampleWidth = () => page.locator("#table-head th").first().evaluate(e => e.getBoundingClientRect().width);
+      const naturalSampleWidth = await sampleWidth();
+      await sampleDivider.press("ArrowLeft");
+      assert.ok(Math.abs(await sampleWidth() - (naturalSampleWidth - 10)) < 1,
+        "Sample can shrink below its automatic fill width");
+      for (let i = 0; i < 55; i++) await sampleDivider.press("ArrowLeft");
+      assert.ok(await sampleWidth() < naturalSampleWidth - 30,
+        "Sample can shrink below its natural content width");
+      await sampleDivider.dblclick();
+      const dividerRect = await sampleDivider.boundingBox();
+      await page.mouse.move(dividerRect.x + dividerRect.width / 2, dividerRect.y + dividerRect.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(dividerRect.x + dividerRect.width / 2 - 50, dividerRect.y + dividerRect.height / 2, { steps: 5 });
+      await page.mouse.up();
+      assert.ok(Math.abs(await sampleWidth() - (naturalSampleWidth - 50)) < 2,
+        "Trusted pointer drag shrinks Sample width");
+      await sampleDivider.dblclick();
+      assert.ok(Math.abs(await sampleWidth() - naturalSampleWidth) < 2,
+        "Reset Sample divider restores automatic fill");
       // The app icon opens the real settings dialog, including at phone widths.
       // Settings UI does not depend on service-worker installation. Keep its
       // asynchronous startup badge from intercepting the icon in this fixture.
@@ -103,7 +164,12 @@ try {
           const level = document.querySelector("#sample-table tr .level-cell");
           const right = level.getBoundingClientRect();
           const rightHeader = document.querySelector("#table-head .level-cell").getBoundingClientRect();
-          return Math.abs(before - left.left) < 1 && Math.abs(header.left - left.left) < 1
+          const panel = wrap.getBoundingClientRect();
+          const gutter = parseFloat(getComputedStyle(wrap).paddingRight) || 0;
+          const outside = [panel.left - 1, panel.right - Math.max(1, gutter / 2)];
+          const noBleed = outside.every(x => !document.elementsFromPoint(x, left.top + left.height / 2)
+            .some(e => e.closest?.("#sample-table")));
+          return noBleed && Math.abs(before - left.left) < 1 && Math.abs(header.left - left.left) < 1
             && Math.abs(right.right - rightHeader.right) < 1
             && first.contains(document.elementFromPoint(left.left + left.width - 2, left.top + left.height / 2))
             && level.contains(document.elementFromPoint(right.left + right.width / 2, right.top + right.height / 2));

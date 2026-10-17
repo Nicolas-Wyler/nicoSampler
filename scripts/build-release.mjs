@@ -121,7 +121,7 @@ if (process.env.GITHUB_ACTIONS !== "true") {
   }
   await fs.writeFile(
     path.join(preview, "README.txt"),
-    `Local-only iPhone previews of nicoSampler ${version}.\nStart.command defaults to iPhone 12 Pro Max (428 x 926). iPhone 12 Smaller.command uses 390 x 844. Both can run together; WebKit, touch and coarse-pointer emulation. This simulates layout, not physical iOS hardware or permissions.\n`,
+    `Local-only iPhone previews of nicoSampler ${version}.\nEach launcher opens portrait and landscape windows, scaled to fit the Mac with a gray viewport outline. Start.command defaults to iPhone 12 Pro Max (428 x 926 and 926 x 428). iPhone 12 Smaller.command uses 390 x 844 and 844 x 390. Both can run together; WebKit, touch and coarse-pointer emulation. This simulates layout, not physical iOS hardware or permissions.\n`,
   );
 }
 const records = [];

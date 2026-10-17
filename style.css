@@ -1018,10 +1018,10 @@ input::-webkit-outer-spin-button {
   touch-action: none;
 }
 .custom-scrollbar.x {
-  height: 8px;
+  height: calc(8px * 2 / 3);
 }
 .custom-scrollbar.y {
-  width: 8px;
+  width: calc(8px * 2 / 3);
 }
 .custom-scroll-thumb {
   position: absolute;
@@ -1034,10 +1034,10 @@ input::-webkit-outer-spin-button {
   cursor: grab;
 }
 .custom-scrollbar.x .custom-scroll-thumb {
-  height: 8px;
+  height: calc(8px * 2 / 3);
 }
 .custom-scrollbar.y .custom-scroll-thumb {
-  width: 8px;
+  width: calc(8px * 2 / 3);
 }
 .custom-scroll-thumb:hover {
   background: #819b70;
@@ -1143,32 +1143,32 @@ dialog.editor[open]:not(:modal) {
 }
 /* Waveform navigation is a touch target, not a tiny system slider. */
 #wave-pan {
-  height: 24px;
-  min-height: 24px;
+  height: 16px;
+  min-height: 16px;
   touch-action: none;
 }
 #wave-pan::-webkit-slider-thumb {
   width: 48px;
-  height: 28px;
+  height: calc(28px * 2 / 3);
   border-radius: 7px;
 }
 #wave-pan::-moz-range-thumb {
   width: 48px;
-  height: 28px;
+  height: calc(28px * 2 / 3);
   border-radius: 7px;
 }
 @media (pointer: coarse) {
   #wave-pan {
-    height: 32px;
-    min-height: 32px;
+    height: calc(32px * 2 / 3);
+    min-height: calc(32px * 2 / 3);
   }
   #wave-pan::-webkit-slider-thumb {
     width: 56px;
-    height: 40px;
+    height: calc(40px * 2 / 3);
   }
   #wave-pan::-moz-range-thumb {
     width: 56px;
-    height: 40px;
+    height: calc(40px * 2 / 3);
   }
 }
 .filter-knobs {

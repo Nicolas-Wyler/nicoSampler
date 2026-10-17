@@ -2926,7 +2926,9 @@ function refreshMidi() {
   if (![...$("input-source").options].some((o) => o.value === value))
     $("input-source").append(option(value, "Saved MIDI input (disconnected)"));
   $("input-source").value = value;
-  $("midi-status").textContent = "";
+  $("midi-status").textContent = connected
+    ? ""
+    : "No MIDI device found. Check its USB/Bluetooth connection, then reconnect.";
   syncControls();
 }
 listen("connect-midi", "click", async () => {
@@ -2934,12 +2936,14 @@ listen("connect-midi", "click", async () => {
     throw Error(
       "Native MIDI is unavailable here. Use Chrome/Edge on macOS or Windows, or play with touch/keyboard.",
     );
-  await enable();
+  // Request access directly in the click gesture, independently of audio startup.
   try {
     midi = await navigator.requestMIDIAccess({ sysex: false });
-  } catch {
+  } catch (error) {
     throw Error(
-      "MIDI permission was denied. Allow MIDI in the browser site settings, then reconnect.",
+      error?.name === "NotAllowedError" || error?.name === "SecurityError"
+        ? "MIDI permission was denied. Allow MIDI in the browser site settings, then reconnect."
+        : `MIDI connection failed: ${error?.message || "unknown browser error"}`,
     );
   }
   midi.onstatechange = () => {
@@ -2947,6 +2951,20 @@ listen("connect-midi", "click", async () => {
     refreshMidi();
   };
   refreshMidi();
+  if (
+    ![...midi.inputs.values()].some((input) => input.state !== "disconnected")
+  ) {
+    status(
+      "No MIDI device found. Check its USB/Bluetooth connection, then reconnect.",
+    );
+    $("toast").textContent =
+      "No MIDI device found. Check its USB/Bluetooth connection, then reconnect.";
+    $("toast").hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => ($("toast").hidden = true), 8000);
+  }
+  // MIDI discovery remains usable even when audio cannot start yet.
+  void enable().catch(report);
   if (!midiPreferenceRestored && state.source === "PC Keyboard") {
     const preferred =
       [...midi.inputs.values()].find((input) => input.state !== "disconnected")
