@@ -42,9 +42,17 @@ try {
         const C = window.AudioContext || window.webkitAudioContext;
         window.recorderQA = { requests: 0, streams: [], analysers: [] };
         const ctx = new C(),
-          source = ctx.createConstantSource();
-        source.offset.value = 0.04;
+          source = ctx.createOscillator(),
+          amplitude = ctx.createGain();
+        source.frequency.value = 440;
+        amplitude.gain.value = 0.04;
+        source.connect(amplitude);
         source.start();
+        recorderQA.peak = () => Math.max(0, ...recorderQA.analysers.map(a => {
+          const data = new Float32Array(a.fftSize);
+          a.getFloatTimeDomainData(data);
+          return Math.max(...data.map(Math.abs));
+        }));
         document.addEventListener("pointerdown", () => void ctx.resume(), {
           capture: true,
         });
@@ -56,7 +64,7 @@ try {
             value: async () => {
               recorderQA.requests++;
               const d = ctx.createMediaStreamDestination();
-              source.connect(d);
+              amplitude.connect(d);
               recorderQA.streams.push(d.stream);
               return d.stream;
             },
@@ -142,24 +150,16 @@ try {
           !document.querySelector("#record-start").disabled,
       );
       assert.equal(await page.locator("#record-monitor").isChecked(), false);
-      const peak = () =>
-        page.evaluate(() =>
-          Math.max(
-            0,
-            ...recorderQA.analysers.map((a) => {
-              const data = new Float32Array(a.fftSize);
-              a.getFloatTimeDomainData(data);
-              return Math.max(...data.map(Math.abs));
-            }),
-          ),
-        );
+      const peak = () => page.evaluate(() => recorderQA.peak());
+      // Wait for real captured AC input, not just a connected stream flag.
+      await page.waitForFunction(() => Number(document.querySelector("#header-input-meter").parentElement.getAttribute("aria-valuenow")) > -50);
       await page.waitForTimeout(150);
       assert(
         (await peak()) < 1e-7,
         "capture must not leak to output while Monitor is off",
       );
       await page.locator("#record-monitor").check();
-      await page.waitForTimeout(150);
+      await page.waitForFunction(() => recorderQA.peak() > 0.01);
       assert(
         (await peak()) > 0.01,
         "Monitor on routes the actual input signal",
@@ -169,18 +169,18 @@ try {
         e.value = "0";
         e.dispatchEvent(new Event("input", { bubbles: true }));
       });
-      await page.waitForTimeout(150);
+      await page.waitForFunction(() => recorderQA.peak() < 1e-7);
       assert((await peak()) < 1e-7, "Master mutes the live monitor output");
       await page.locator("#master").evaluate((e) => {
         e.value = "50";
         e.dispatchEvent(new Event("input", { bubbles: true }));
       });
-      await page.waitForTimeout(150);
+      await page.waitForFunction(() => recorderQA.peak() > 0.01);
       await page.locator("#record-gain").evaluate((e) => {
         e.value = "6";
         e.dispatchEvent(new Event("input", { bubbles: true }));
       });
-      await page.waitForTimeout(150);
+      await page.waitForFunction(minimum => recorderQA.peak() > minimum, unityPeak * 1.8);
       assert(
         (await peak()) > unityPeak * 1.8,
         "recording gain updates the live monitor path",
@@ -190,7 +190,7 @@ try {
         e.dispatchEvent(new Event("input", { bubbles: true }));
       });
       await page.locator("#record-monitor").uncheck();
-      await page.waitForTimeout(150);
+      await page.waitForFunction(() => recorderQA.peak() < 1e-7);
       assert((await peak()) < 1e-7, "Monitor off silences the output path");
       for (let i = 1; i <= 3; i++) {
         await page.locator("#record-start").click();
@@ -271,7 +271,7 @@ try {
       const box = await rows.first().locator("td").nth(2).boundingBox();
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
       await page.mouse.down();
-      await page.waitForTimeout(620);
+      await page.waitForTimeout(1400);
       await page.mouse.up();
       assert(
         await page

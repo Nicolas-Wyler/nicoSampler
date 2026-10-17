@@ -30,7 +30,7 @@ Core playback and file workflows are tested in Chromium, Firefox and WebKit. Thi
 
 ## Your files
 
-Projects and recorded takes recover in this browser's local storage. They are not automatically written to a Finder/Explorer folder or synced between browsers. **Save → Bank** downloads a portable archive, including saved takes; **Recorded takes → Export WAV** downloads an individual recording. Browser recovery belongs to its origin, port and profile. Keep project ZIP backups.
+Projects and recorded takes recover in this browser's local storage. They are not automatically written to a Finder/Explorer folder or synced between browsers. **Save → Bank** downloads a portable archive, including saved takes; use **Use Recording** to add a take to the sample table, then **Save → Sample** or **Save → Resample** to export it. Browser recovery belongs to its origin, port and profile. Keep project ZIP backups.
 
 ## Documentation
 

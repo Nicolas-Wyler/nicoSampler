@@ -22,6 +22,7 @@ export class RecordedTakesTable {
         this.primary = row.dataset.takeId;
         this.suppressUntil = performance.now() + 800;
         this.longPressActive = true;
+        this.longPressPointerId = this.press?.id;
         this.press = null;
         this.render();
       }, 500);
@@ -34,8 +35,12 @@ export class RecordedTakesTable {
         this.cancelPress();
     });
     for (const type of ["pointerup", "pointercancel", "lostpointercapture"])
-      document.addEventListener(type, () => {
-        if (this.longPressActive) {
+      document.addEventListener(type, (e) => {
+        if (
+          this.longPressActive &&
+          e.pointerId === this.longPressPointerId &&
+          type !== "lostpointercapture"
+        ) {
           this.suppressUntil = performance.now() + 350;
           this.longPressActive = false;
         }

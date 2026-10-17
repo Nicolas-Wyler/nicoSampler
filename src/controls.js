@@ -306,7 +306,8 @@ function syncScrollbars() {
           element.style[`padding${axis}`] = value;
       }
     }
-    const modal = element.tagName === "DIALOG" && element.matches(":modal");
+    const ownerDialog = element.closest("dialog[open]");
+    const modal = Boolean(ownerDialog?.matches(":modal"));
     const r = element.getBoundingClientRect();
     for (const { track, thumb, axis } of tracks) {
       const extent = axis === "x" ? element.scrollWidth : element.scrollHeight,
@@ -322,7 +323,7 @@ function syncScrollbars() {
       const visibleTrack = r.width > 0 && r.height > 0 && extent > visible + 1;
       // A modal dialog makes body siblings inert. Its tracks must belong to it
       // and enter the top layer so their fixed viewport coordinates stay valid.
-      const parent = modal ? element : document.body;
+      const parent = modal ? ownerDialog : document.body;
       if (track.parentElement !== parent) {
         if (track.matches(":popover-open")) track.hidePopover();
         parent.append(track);
@@ -343,8 +344,10 @@ function syncScrollbars() {
         track.removeAttribute("popover");
         track.hidden = !visibleTrack;
       }
-      if (element.tagName === "DIALOG")
-        track.style.zIndex = String(Number(element.style.zIndex || 100) + 1);
+      if (ownerDialog) {
+        const layer = Number(getComputedStyle(ownerDialog).zIndex);
+        track.style.zIndex = String((Number.isFinite(layer) ? layer : 100) + 1);
+      } else track.style.zIndex = "";
       track.style.left =
         (axis === "x" ? r.left : r.right - thickness - 1) + "px";
       track.style.top =

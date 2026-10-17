@@ -1663,7 +1663,7 @@ button.brand-icon {padding:0;border:0;background:transparent;overflow:hidden;cur
 .row-preview {display:grid;place-items:center;}
 .row-preview svg {display:block;width:32px;height:32px;pointer-events:none;}
 
-.record-input-row {align-items:center;flex-wrap:nowrap;}
+#record-dialog .record-input-row {grid-template-columns:minmax(0,1fr) auto;align-items:center;}
 .record-audible-monitor {display:flex;align-items:center;gap:7px;white-space:nowrap;}
 #recorded-takes-wrap {overflow:auto;max-height:250px;min-height:52px;position:relative;margin:8px 0;}
 #recorded-takes-table {border-collapse:collapse;min-width:100%;width:max-content;font-size:12px;}
@@ -1683,3 +1683,6 @@ button.brand-icon {padding:0;border:0;background:transparent;overflow:hidden;cur
 #recorded-takes-table td:first-child {display:table-cell;}
 #recorded-takes-table th:first-child {z-index:3;}
 #recorded-takes-table .take-play {margin:auto;}
+
+#record-dialog .record-input-row > .field {margin-bottom:0;}
+#record-dialog .record-input-row {margin-bottom:13px;}

@@ -19,3 +19,7 @@ MIDI controls appear when usable inputs are connected. Where Web MIDI is unavail
 Recent independent Classic reviews achieved 9.0/10 with no reproduced blocker across their stated checks. Release testing includes generated, deterministic examples. Test counts change as new checks are added; do not read a past score as a guarantee of untested hardware or future changes. Raw personal-machine verification logs are intentionally excluded from this public repository. Portable repeatable tests and a release QA summary are provided instead.
 
 Known deliberate limits: physical iPhone verification remains pending; cross-window Cut keeps original rows while pasting copies; transient Trim viewport/undo/live permission state are not restored from a project; PWA updates may need a reload after a new service worker activates. Unsigned native downloads may prompt for OS approval. Browser-local storage is origin/profile/port specific, so export ZIP backups.
+
+## System-output recording
+
+The original Python sampler uses a native macOS Swift helper for its direct System Audio input. The dependency-free browser/PWA build does not include that native helper. It requests system audio through the browser screen-sharing picker; this requires choosing a tab/window/screen, and full system-audio availability depends on the browser/OS. The sampler processes audio only and does not record or upload screen video. Installing the PWA does not grant native capture access.
