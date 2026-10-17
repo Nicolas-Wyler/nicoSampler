@@ -49,4 +49,6 @@ This is source available under a custom license, not permissive/OSI open source.
 
 ## Local iPhone layout preview
 
+Primary compatibility target: iPhone 12 Pro Max running iOS 18.3. Desktop WebKit emulation cannot reproduce that exact iOS engine; physical-device validation is required for platform-specific behavior.
+
 Every local release build also generates ignored `artifacts/iphone-preview/Start.command`. Double-click it to launch WebKit at a fixed iPhone 12 Pro Max viewport (428 × 926) with touch and coarse-pointer settings. Use `iPhone 12 Smaller.command` for a second 390 × 844 preview; both can run together. Install Playwright WebKit first with `npx playwright install webkit` if needed. This preview and its app copy stay local and are excluded from public archives. It simulates layout, not physical iOS hardware, permissions or Safari integration.

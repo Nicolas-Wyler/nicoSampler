@@ -86,12 +86,9 @@ try {
         return hit?.closest(".knob") === dial.closest(".knob");
       });
       // The app icon opens the real settings dialog, including at phone widths.
-      await page.waitForFunction(
-        () => document.querySelector("#offline-status").textContent.includes("Ready offline"),
-        null, { timeout: 60000 },
-      );
-      if (await page.locator("#offline-status").isVisible())
-        await page.locator("#offline-status").click();
+      // Settings UI does not depend on service-worker installation. Keep its
+      // asynchronous startup badge from intercepting the icon in this fixture.
+      await page.addStyleTag({ content: "#offline-status { display: none !important; }" });
       for (const width of [320, 390, 1150]) {
         await page.setViewportSize({ width, height: 800 });
         await page.locator("#sampler-settings-open").click();
@@ -124,8 +121,7 @@ try {
       await page.waitForFunction(() => document.querySelector("#save-status").textContent === "Saved on this device");
       await page.reload();
       await page.waitForFunction(() => document.querySelector("#sample-count").textContent === "16");
-      if (await page.locator("#offline-status").isVisible())
-        await page.locator("#offline-status").click();
+      await page.addStyleTag({ content: "#offline-status { display: none !important; }" });
       await page.locator("#sampler-settings-open").click();
       assert.equal(await page.locator("#settings-master").inputValue(), "73");
       assert.equal(await page.locator("#settings-input").inputValue(), "None");
@@ -136,7 +132,13 @@ try {
       await page.locator("#settings-piano").check();
       await page.locator("#sampler-settings-close").click();
       await page.locator("#enable-audio").click();
-      await page.locator(".row-preview").first().click();
+      const rowPreview = page.locator(".row-preview").first();
+      assert.equal(await rowPreview.locator("svg path").count(), 1);
+      assert.equal(await rowPreview.locator("svg").getAttribute("aria-hidden"), "true");
+      await rowPreview.click();
+      await page.waitForFunction(() => !!document.querySelector(".row-preview svg rect"));
+      assert.match(await rowPreview.getAttribute("aria-label"), /Stop/);
+
       await page.waitForFunction(
         () =>
           Number(
@@ -145,7 +147,18 @@ try {
               .parentElement.getAttribute("aria-valuenow"),
           ) > -60,
       );
+      await rowPreview.click();
+      await page.waitForFunction(() => !!document.querySelector(".row-preview svg path"));
+      assert.match(await rowPreview.getAttribute("aria-label"), /Play/);
+      await page.locator(".row-handle").nth(1).click({ modifiers: ["ControlOrMeta"] });
+      assert.equal(await page.locator("#sample-table tr.selected").count(), 2);
+      await rowPreview.click();
+      await page.waitForFunction(() => document.querySelectorAll("#sample-table tr.selected .row-preview svg rect").length === 2);
+      await rowPreview.click();
+      await page.waitForFunction(() => document.querySelectorAll("#sample-table tr.selected .row-preview svg path").length === 2);
       await page.locator("#panic").click();
+      assert.equal(await page.locator(".row-preview svg path").count(), 16);
+
       await page.locator("#master-knob").focus();
       await page.keyboard.press("Home");
       assert.equal(await page.locator("#master").inputValue(), "0");

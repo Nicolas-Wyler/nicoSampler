@@ -3,6 +3,11 @@ import { playbackParts, playbackMode } from "./workflows.js";
 import { createZoomInertia } from "./zoom-inertia.js";
 import { selectLabel } from "./controls.js";
 import { createKeyColorMap } from "./key-colors.js";
+// Geometry and placement match the previous 17px macOS row glyphs.
+// Shared by initial rendering, playback-meter updates, and Panic.
+export function setRowPreviewIcon(button, playing) {
+  button.innerHTML = `<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false" fill="currentColor">${playing ? '<rect x="12.08" y="14.16" width="7.84" height="7.84" />' : '<path d="M9.88 8.06 22.25 15.2 9.88 22.34Z" />'}</svg>`;
+}
 const headers = [
   "Sample",
   "Env",
@@ -1089,11 +1094,8 @@ export class ClassicUI {
         this.dragId = null;
         this.dragIds = null;
       };
-      const preview = element(
-        "button",
-        "row-preview",
-        api.auditioning?.(s.id) ? "■" : "▶",
-      );
+      const preview = element("button", "row-preview");
+      setRowPreviewIcon(preview, Boolean(api.auditioning?.(s.id)));
       preview.setAttribute(
         "aria-label",
         (api.auditioning?.(s.id) ? "Stop preview of " : "Play preview of ") +

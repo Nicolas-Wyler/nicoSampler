@@ -1659,3 +1659,6 @@ button.brand-icon {padding:0;border:0;background:transparent;overflow:hidden;cur
 .settings-fields {display:grid;gap:14px;padding:12px 0;}
 .settings-fields label {display:flex;align-items:center;justify-content:space-between;gap:16px;}
 .settings-fields input[type="number"] {width:90px;}
+
+.row-preview {display:grid;place-items:center;}
+.row-preview svg {display:block;width:32px;height:32px;pointer-events:none;}

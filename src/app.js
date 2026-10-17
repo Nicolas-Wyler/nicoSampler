@@ -28,7 +28,7 @@ import {
 import { updateMeters, dbPosition, positionDb } from "./meters.js";
 import { initControls, syncControls } from "./controls.js";
 import { RowSelection, moveRows } from "./selection.js";
-import { ClassicUI } from "./classic-ui.js";
+import { ClassicUI, setRowPreviewIcon } from "./classic-ui.js";
 import { installProgramDragging } from "./program-drag.js";
 import {
   copySamples,
@@ -948,7 +948,7 @@ function stopAll() {
   panicEpoch++;
   auditions.clear();
   document.querySelectorAll(".row-preview").forEach((b) => {
-    b.textContent = "▶";
+    setRowPreviewIcon(b, false);
     b.setAttribute("aria-label", "Play sample");
   });
   releaseHeld();
@@ -3590,7 +3590,7 @@ function audioEvent(m) {
         auditions.delete(id);
       const button = document.querySelector(`[data-id="${id}"] .row-preview`);
       if (button) {
-        button.textContent = auditions.has(id) ? "■" : "▶";
+        setRowPreviewIcon(button, auditions.has(id));
         button.setAttribute(
           "aria-label",
           `${auditions.has(id) ? "Stop" : "Play"} sample`,
