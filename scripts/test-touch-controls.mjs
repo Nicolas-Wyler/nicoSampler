@@ -34,6 +34,21 @@ try {
     await page.locator('#landing-new').tap();await page.locator('#load-kind').selectOption('example');
     await page.waitForFunction(()=>document.querySelector('#sample-count').textContent==='16');
     const cdp=await page.context().newCDPSession(page);
+    if (Number(process.env.TOUCH_CPU_RATE)>1)
+      await cdp.send('Emulation.setCPUThrottlingRate',{rate:Number(process.env.TOUCH_CPU_RATE)});
+    await page.evaluate(() => {
+      window.touchControlTrace=[];
+      for(const type of ['pointerdown','pointerup','pointercancel','lostpointercapture','click','touchstart','touchend'])
+        document.addEventListener(type,e=>{
+          const b=document.querySelector('#mobile-select');
+          const r=document.querySelector('#record-open');
+          touchControlTrace.push({time:Math.round(performance.now()),type,target:e.target.closest?.('button')?.id || e.target.closest?.('[data-id]')?.dataset.id || e.target.className,
+            trusted:e.isTrusted,pointer:e.pointerType,id:e.pointerId,touches:e.touches?.length,
+            done:b.textContent,selected:document.querySelectorAll('#sample-table tr.selected').length,
+            recordHidden:r.hidden,recordDisabled:r.disabled,scroll:document.querySelector('#table-wrap').scrollTop});
+          if(touchControlTrace.length>100)touchControlTrace.shift();
+        },{capture:true,passive:true});
+    });
     async function gesture(locator,{hold=0,dy=0,dx=0}={}){
       await locator.scrollIntoViewIfNeeded();const r=await locator.boundingBox(),x=r.x+r.width/2,y=r.y+r.height/2;
       await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
@@ -89,9 +104,36 @@ try {
     await page.waitForFunction(() => !document.body.classList.contains('dragging-samples'));
     assert.equal(await page.locator('#mobile-select').textContent(), 'Done',
       'Group drag preserves explicit selection mode');
+    // A native fling can consume the next touch as a stop-scroll gesture. Wait
+    // until both scrollers and the toolbar hit rectangle are actually stationary.
+    await page.evaluate(() => new Promise((resolve,reject) => {
+      let signature='',stableSince=performance.now();const deadline=performance.now()+5000;
+      const frame=()=>{
+        const wrap=document.querySelector('#table-wrap'),button=document.querySelector('#mobile-select'),r=button.getBoundingClientRect();
+        const next=JSON.stringify([wrap.scrollTop,wrap.scrollLeft,window.scrollX,window.scrollY,r.x,r.y,r.width,r.height]);
+        const now=performance.now();
+        if(next!==signature){signature=next;stableSince=now;}
+        if(now-stableSince>=250)return resolve();
+        if(now>deadline)return reject(Error('Scroll/toolbar did not settle before Done'));
+        requestAnimationFrame(frame);
+      };frame();
+    }));
     await page.locator('#mobile-select').tap();
-    await page.waitForFunction(() => document.querySelector('#mobile-select').textContent === 'Select'
-      && !document.querySelector('#record-open').hidden && !document.querySelector('#record-open').disabled);
+    try {
+      await page.waitForFunction(() => document.querySelector('#mobile-select').textContent === 'Select'
+        && !document.querySelector('#record-open').hidden && !document.querySelector('#record-open').disabled,
+        null,{timeout:5000});
+    } catch(error) {
+      console.error('DONE TOUCH FAILURE',JSON.stringify(await page.evaluate(()=>({
+        trace:touchControlTrace,done:document.querySelector('#mobile-select').outerHTML,doneRect:document.querySelector('#mobile-select').getBoundingClientRect().toJSON(),
+        record:document.querySelector('#record-open').outerHTML,
+        drag:document.body.classList.contains('dragging-samples'),
+        active:document.activeElement?.outerHTML,
+        scrollers:[...document.querySelectorAll('#table-wrap,.toolbar')].map(e=>({class:e.className,top:e.scrollTop,left:e.scrollLeft,rect:e.getBoundingClientRect().toJSON()}))
+      }))));
+      await page.screenshot({path:'/tmp/nicosampler-done-touch-failure.png'});
+      throw error;
+    }
     assert.equal(await page.locator('#sample-table tr.selected').count(),1,
       'Done collapses selection before opening the recorder');
     await page.locator('#record-open').tap();
