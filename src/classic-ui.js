@@ -32,6 +32,7 @@ const fullHeaders = {
 };
 const LOCKED_COLUMNS = new Set([5, 8, 9, 10, 11]);
 const ROW_SIZE = 49;
+const ROW_CONTROLS_WIDTH = 88;
 const KNOB_DIAMETER = 24;
 const fixedColumnWidth = (i) => (i === 5 ? ROW_SIZE : KNOB_DIAMETER * 1.5);
 const baseWidths = [220, 80, 110, 110, 156, 76, 76, 80, 64, 64, 72, 68];
@@ -814,6 +815,9 @@ export class ClassicUI {
         return c;
       }),
     );
+    const controlsCol = element("col", "row-controls-col");
+    controlsCol.style.width = ROW_CONTROLS_WIDTH + "px";
+    this.cols.prepend(controlsCol);
     this.head.replaceChildren(
       ...headers.map((title, i) => {
         const th = element(
@@ -882,19 +886,22 @@ export class ClassicUI {
         return th;
       }),
     );
+    const controlsHeader = element("th", "row-controls-cell");
+    controlsHeader.setAttribute("aria-label", "Sample controls");
+    this.head.prepend(controlsHeader);
     this.applyWidths();
   }
   applyWidths() {
-    [...this.cols.children].forEach(
+    [...this.cols.children].filter(c => !c.classList.contains("row-controls-col")).forEach(
       (c, i) => (c.style.width = this.widths[i] + "px"),
     );
     document.getElementById("sample-grid").style.width =
-      this.widths.reduce((a, b) => a + b, 0) + "px";
+      (ROW_CONTROLS_WIDTH + this.widths.reduce((a, b) => a + b, 0)) + "px";
     this.updateHeaderLabels();
   }
   updateHeaderLabels() {
     const context = document.createElement("canvas").getContext("2d");
-    [...this.head.children].forEach((th, i) => {
+    [...this.head.children].filter(th => !th.classList.contains("row-controls-cell")).forEach((th, i) => {
       const long = fullHeaders[i];
       if (!long) return;
       const style = getComputedStyle(th);
@@ -920,7 +927,7 @@ export class ClassicUI {
       LOCKED_COLUMNS.has(i)
         ? fixedColumnWidth(i)
         : this.manualWidths.has(i)
-          ? Math.max(i === 0 ? 116 : 45, this.manualWidths.get(i))
+          ? Math.max(i === 0 ? ROW_SIZE : 45, this.manualWidths.get(i))
           : width,
     );
     const wrap = document.getElementById("table-wrap"),
@@ -928,7 +935,7 @@ export class ClassicUI {
     const available =
       wrap.clientWidth -
       (parseFloat(wrapStyle.paddingLeft) || 0) -
-      (parseFloat(wrapStyle.paddingRight) || 0);
+      (parseFloat(wrapStyle.paddingRight) || 0) - ROW_CONTROLS_WIDTH;
     this.expandedHeaders = new Set();
     const proposed = this.widths.map((width, i) =>
       LOCKED_COLUMNS.has(i)
@@ -1013,14 +1020,14 @@ export class ClassicUI {
     };
     const textBox = (node) =>
       textWidth(node, node.textContent) + boxWidth(getComputedStyle(node));
-    const widths = [...this.head.children].map(
+    const widths = [...this.head.children].filter(th => !th.classList.contains("row-controls-cell")).map(
       (th, i) =>
         textWidth(th, headers[i]) +
         boxWidth(getComputedStyle(th)) +
         (LOCKED_COLUMNS.has(i) ? 0 : 9),
     );
     for (const row of this.table.rows) {
-      [...row.cells].forEach((cell, i) => {
+      [...row.cells].filter(cell => !cell.classList.contains("row-controls-cell")).forEach((cell, i) => {
         let width = boxWidth(getComputedStyle(cell)),
           count = 0;
         const children = cell.firstElementChild?.matches(".sample-cell-content")
@@ -1038,7 +1045,7 @@ export class ClassicUI {
             // Reserve the same 6px breathing room as the custom full-cell selector.
             width += textWidth(button ?? child, label) + 12;
           } else if (child.matches(".row-fixed-controls")) {
-            width += 106;
+            width += ROW_CONTROLS_WIDTH;
           } else if (child.matches(".sample-name")) {
             width += ROW_SIZE - 1;
           } else if (child.matches(".key-assignment,.pitch-drag")) {
@@ -1058,7 +1065,7 @@ export class ClassicUI {
         widths[i] = Math.max(widths[i], width);
       });
     }
-    this.fullHeaderWidths = [...this.head.children].map((th, i) =>
+    this.fullHeaderWidths = [...this.head.children].filter(th => !th.classList.contains("row-controls-cell")).map((th, i) =>
       fullHeaders[i]
         ? Math.ceil(
             textWidth(th, fullHeaders[i]) +
@@ -1173,7 +1180,9 @@ export class ClassicUI {
       cells[4].classList.add("key-cell");
       for (const i of LOCKED_COLUMNS) cells[i].classList.add("square-cell");
       cells[11].classList.add("level-cell");
-      tr.append(...cells);
+      const controlsCell = element("td", "row-controls-cell");
+      cells[0].classList.add("sample-name-cell");
+      tr.append(controlsCell, ...cells);
       const channels = element("span", "row-channel-buttons");
       const mute = element(
         "button",
@@ -1202,8 +1211,13 @@ export class ClassicUI {
         api.edit(s, "solo", !s.solo);
       };
       channels.append(mute, solo);
-      const led = element("span", "activity");
-      led.setAttribute("aria-label", "Sample activity");
+      const led = element("span", "activity row-activity-bar");
+      led.setAttribute("aria-label", "Sample playback activity");
+      for (let segment = 0; segment < 12; segment++) {
+        const light = element("span");
+        light.setAttribute("aria-hidden", "true");
+        led.append(light);
+      }
       const handle = element("button", "row-handle", "⋮⋮");
       handle.draggable = false;
       handle.onpointerdown = (e) => {
@@ -1314,9 +1328,10 @@ export class ClassicUI {
         event.stopPropagation();
         api.sampleColor?.(s);
       };
-      fixedControls.append(stripe, channels, led, handle, preview);
+      fixedControls.append(stripe, led, channels, handle, preview);
       const content = element("span", "sample-cell-content");
-      content.append(fixedControls, name);
+      controlsCell.append(fixedControls);
+      content.append(name);
       cells[0].append(content);
       const env = element("button", "mini-preview");
       env.setAttribute("aria-label", "Edit envelope for " + s.name);
@@ -1483,7 +1498,7 @@ export class ClassicUI {
     const footer = table.tFoot ?? table.createTFoot();
     const addRow = element("tr", "add-sample-row");
     const addCell = element("td");
-    addCell.colSpan = headers.length;
+    addCell.colSpan = headers.length + 1;
     const addSample = element("button", "add-sample-button", "+");
     addSample.setAttribute("aria-label", "New sample");
     addSample.title = "New sample";

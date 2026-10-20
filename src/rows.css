@@ -574,3 +574,64 @@ tfoot .add-sample-row td {
 }
 
 @media(pointer:coarse) { .master #master-knob {touch-action:pan-x pan-y;} }
+
+/* Flush row identity and playback strips align with the Sample header edge. */
+#sample-table td:first-child { padding-left: 0; }
+#sample-table .row-key-colors {
+  flex: 0 0 6px;
+  width: 6px;
+  min-width: 6px;
+  height: 48px;
+  padding: 0;
+  background-clip: border-box;
+}
+#sample-table .row-activity-bar {
+  display: grid;
+  grid-template-rows: repeat(12, minmax(0, 1fr));
+  gap: 1px;
+  flex: 0 0 6px;
+  width: 6px;
+  height: 48px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  align-self: center;
+}
+#sample-table .row-activity-bar > span {
+  background: #344133;
+  border-radius: 1px;
+  transition: background-color 70ms linear;
+}
+#sample-table tr.playing .row-activity-bar > span {
+  background: var(--accent);
+}
+
+/* Row actions are a separate fixed column; Sample contains only the name. */
+#sample-grid .row-controls-cell {
+  width: 88px;
+  min-width: 88px;
+  max-width: 88px;
+  padding: 0;
+}
+#sample-table .row-fixed-controls {
+  width: 88px;
+  flex-basis: 88px;
+}
+#sample-table .row-handle {
+  width: 12px;
+  min-width: 12px;
+  max-width: 12px;
+  padding: 0;
+  overflow: hidden;
+  font-size: 10px;
+}
+#sample-table .sample-name-cell {
+  position: static;
+  box-shadow: none;
+  padding-inline: 2px;
+}
+#sample-table .sample-name-cell .sample-cell-content,
+#sample-table .sample-name-cell .sample-name {
+  width: 100%;
+}

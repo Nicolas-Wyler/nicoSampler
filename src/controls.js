@@ -334,6 +334,10 @@ function enhanceScroll(element) {
     dragging = 0;
   function reveal() {
     clearTimeout(activityTimer);
+    if (element.id === "keyboard-scroll" && element.dataset.navigationLocked === "true") {
+      for (const { track } of tracks) track.classList.remove("is-scrolling");
+      return;
+    }
     for (const { track } of tracks) track.classList.add("is-scrolling");
     if (!dragging)
       activityTimer = setTimeout(() => {
@@ -475,7 +479,7 @@ function syncScrollbars() {
         );
       track.style[axis === "x" ? "height" : "width"] = thickness + "px";
       thumb.style[axis === "x" ? "height" : "width"] = thickness + "px";
-      const visibleTrack = r.width > 0 && r.height > 0 && extent > visible + 1;
+      const visibleTrack = r.width > 0 && r.height > 0 && extent > visible + 1 && (axis === "x" ? hasX : hasY);
       // A modal dialog makes body siblings inert. Its tracks must belong to it
       // and enter the top layer so their fixed viewport coordinates stay valid.
       const parent = modal ? ownerDialog : document.body;
