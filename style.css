@@ -2190,3 +2190,9 @@ textarea,
   stroke-linejoin: round;
   vertical-align: middle;
 }
+.storagebar > #save-kind,
+.storagebar > #load-kind,
+.storagebar > .midi-routing > #input-routing-label,
+.storagebar > .audio-tools > #enable-audio {
+  display: none;
+}

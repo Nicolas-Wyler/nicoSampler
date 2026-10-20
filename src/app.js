@@ -4689,6 +4689,8 @@ listen("sampler-settings-open", "click", () => {
     );
     $(target).value = $(source).value;
   }
+  $("settings-enable-audio").textContent = $("enable-audio").textContent.trim();
+  $("settings-enable-audio").disabled = $("enable-audio").disabled;
   $("settings-piano").checked = !document
     .querySelector(".keyboard-panel")
     .classList.contains("is-folded");
@@ -4696,6 +4698,16 @@ listen("sampler-settings-open", "click", () => {
   syncControls();
 });
 listen("sampler-settings-close", "click", () => $("sampler-settings").close());
+for (const [proxy, source] of [
+  ["settings-save-kind", "save-kind"],
+  ["settings-load-kind", "load-kind"],
+])
+  listen(proxy, "change", () => {
+    $(source).value = $(proxy).value;
+    $(source).dispatchEvent(new Event("change", { bubbles: true }));
+    $(proxy).value = "";
+  });
+listen("settings-enable-audio", "click", () => $("enable-audio").click());
 listen("settings-master", "change", (event) => {
   const value = Number(event.target.value);
   if (

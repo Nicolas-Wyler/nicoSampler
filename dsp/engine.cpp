@@ -248,7 +248,7 @@ API void configure(int id, int ptr) {
   s.maxVelocity = int(p[15]);
   s.start = max(0, min(s.frames - 1, int(p[16])));
   s.end = max(s.start + 1, min(s.frames, int(p[17])));
-  s.loopStart = max(s.start, min(s.end - 1, int(p[18])));
+  s.loopStart = max(0, min(s.end - 1, int(p[18])));
   s.loopEnd = max(s.loopStart + 1, min(s.end, int(p[19])));
   s.reverse = int(p[20]);
   s.crush = max(100, min(44100, int(p[21])));

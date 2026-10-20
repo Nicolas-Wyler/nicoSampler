@@ -240,15 +240,12 @@ export class Waveform {
       frame = Math.round(this.frame(x));
     if (this.drag.marker === "trim_start") {
       s.trim_start = clamp(frame, 0, (s.trim_end ?? n) - 1);
-      s.loop_start = Math.max(s.loop_start ?? s.trim_start, s.trim_start);
     }
     if (this.drag.marker === "trim_end") {
       s.trim_end = clamp(frame, s.trim_start + 1, n);
-      s.loop_end = Math.min(s.loop_end ?? s.trim_end, s.trim_end);
     }
     if (this.drag.marker === "loop_start") {
       s.loop_start = clamp(frame, 0, (s.loop_end ?? s.trim_end ?? n) - 1);
-      s.trim_start = Math.min(s.trim_start, s.loop_start);
     }
     if (this.drag.marker === "loop_end") {
       s.loop_end = clamp(frame, (s.loop_start ?? s.trim_start) + 1, n);

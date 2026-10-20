@@ -260,12 +260,13 @@ export function fitMarkers(s) {
   const n = s.audio[0].length;
   s.trim_start = clamp(s.trim_start, 0, n - 1);
   s.trim_end = clamp(s.trim_end ?? n, s.trim_start + 1, n);
-  s.loop_start = clamp(
-    s.loop_start ?? s.trim_start,
-    s.trim_start,
-    s.trim_end - 1,
-  );
-  s.loop_end = clamp(s.loop_end ?? s.trim_end, s.loop_start + 1, s.trim_end);
+  if (!s.playback.startsWith("loop")) {
+    s.loop_start = clamp(s.loop_start ?? s.trim_start, 0, n);
+    s.loop_end = clamp(s.loop_end ?? s.trim_end, 0, n);
+  } else {
+    s.loop_start = clamp(s.loop_start ?? s.trim_start, 0, s.trim_end - 1);
+    s.loop_end = clamp(s.loop_end ?? s.trim_end, s.loop_start + 1, s.trim_end);
+  }
 }
 export function validateBank(raw) {
   if (

@@ -159,7 +159,7 @@
 
       <section class="samples-panel" aria-label="Samples">
         <div class="panel-heading">
-          <h1>Samples <span id="sample-count">0</span></h1>
+          <h1 aria-label="Sample count"><span id="sample-count">0</span></h1>
           <span id="memory-info" class="subtle"></span>
         </div>
         <div class="toolbar">
@@ -884,6 +884,19 @@
         </button>
       </header>
       <div class="settings-fields">
+        <label>Save
+          <select id="settings-save-kind" aria-label="Save">
+            <option value="">Save</option><option value="bank">Bank</option><option value="program">Program</option><option value="sample">Sample</option><option value="render">Resample</option>
+          </select>
+        </label>
+        <label>Load
+          <select id="settings-load-kind" aria-label="Load">
+            <option value="">Load</option><option value="bank">Bank</option><option value="program">Program</option><option value="sample">Sample</option><option value="example">Example kit</option>
+          </select>
+        </label>
+        <label>Enable audio
+          <button id="settings-enable-audio" type="button">Enable audio</button>
+        </label>
         <label
           >Master level (%)
           <input id="settings-master" type="number" min="0" max="100" step="1"
