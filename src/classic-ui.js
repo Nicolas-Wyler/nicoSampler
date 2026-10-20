@@ -192,7 +192,6 @@ export class ClassicUI {
       grip.addEventListener("pointermove", (e) => {
         if (start?.id === e.pointerId) {
           const height = start.height + start.y - e.clientY;
-          this.setKeyboardCollapsed(height < 90);
           this.setPianoHeight(height);
         }
       });

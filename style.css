@@ -2303,3 +2303,24 @@ textarea,
   background: var(--panel);
   isolation: isolate;
 }
+
+.phone-ui .keyboard-panel .statusline {
+  height: 27px;
+  min-height: 27px;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding-block: 0;
+}
+.phone-ui .keyboard-panel #keyboard-fold,
+.phone-ui .keyboard-panel #keyboard-mode {
+  height: 25px;
+  min-height: 25px;
+  padding-block: 0;
+}
+.phone-ui .keyboard-panel .piano-resize-handle {
+  height: 25px;
+}
+.keyboard-panel.is-folded .piano-resize-handle {
+  visibility: hidden;
+  pointer-events: none;
+}
