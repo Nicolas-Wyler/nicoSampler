@@ -121,7 +121,7 @@ const rowSelection = new RowSelection(),
 const selectedIds = () => rowSelection.reconcile(current());
 const touchSelectionUI = /iPhone|iPod|Android.*Mobile/i.test(
   navigator.userAgent,
-);
+  ) || location.pathname.includes("/mobile/");
 document.body.classList.toggle("phone-ui", touchSelectionUI);
 const storedBytes = () => audioBytes(state.programs, state.takes ?? []);
 const projectedBytes = (audio, replacing = null, source = null) =>
@@ -2081,7 +2081,6 @@ for (const [id, key] of [
         throw Error("Loop start must precede loop end");
       }
       s.loop_start = frame;
-      s.trim_start = Math.min(s.trim_start, frame);
     }
     if (key === "loop_end") {
       if (frame <= (s.loop_start ?? s.trim_start)) {
@@ -2089,7 +2088,6 @@ for (const [id, key] of [
         throw Error("Loop end must follow loop start");
       }
       s.loop_end = frame;
-      s.trim_end = Math.max(s.trim_end, frame);
     }
     fitMarkers(s);
     await commit(s, !!s.normalization, true);
@@ -4072,12 +4070,18 @@ async function boot() {
   // arguments passed to `open -a`. The desktop launcher therefore publishes
   // the selected project through its localhost helper instead.
   if (!launchUrl) {
-    try {
-      const probe = await fetch("http://127.0.0.1:8770/launch.json", {
-        cache: "no-store",
-      });
-      if (probe.ok) launchUrl = (await probe.json()).project || null;
-    } catch {}
+    for (const bridge of [
+      "http://localhost:8770/launch.json",
+      "http://127.0.0.1:8770/launch.json",
+    ]) {
+      try {
+        const probe = await fetch(bridge, { cache: "no-store" });
+        if (probe.ok) {
+          launchUrl = (await probe.json()).project || null;
+          if (launchUrl) break;
+        }
+      } catch {}
+    }
   }
   let launchedProject = false;
   if (launchUrl) {

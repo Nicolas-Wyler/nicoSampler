@@ -55,7 +55,11 @@ export class ClassicUI {
     this.keyboardMinZoom = /iPhone|iPod/i.test(navigator.userAgent)
       ? 75 / 14
       : 1;
-    this.phonePiano = /iPhone|iPod/i.test(navigator.userAgent);
+    // The mobile deployment intentionally uses the iOS interaction profile
+    // on every phone/tablet OS so controls and gestures remain consistent.
+    this.phonePiano =
+      /iPhone|iPod/i.test(navigator.userAgent) ||
+      location.pathname.includes("/mobile/");
     this.externalKeyboardSeen = !this.phonePiano;
     this.pianoTouchMode = "play";
     this.playPointers = new Map();
