@@ -47,3 +47,7 @@ Projects and recorded takes recover in this browser's local storage. They are no
 Read the short [nicoSampler Source-Available License](LICENSE). Tinkering and free forks are allowed with retained notices. Commercial music and performances require neither permission nor attribution. Commercializing the software—including paid DAW integration—and monetized tutorials/reviews/demos primarily about the app require prior written permission. Third-party components keep their own licenses. This commercial restriction means the project is source available, not OSI-approved open source.
 
 Commercial licensing requests can be made through this repository. No license applies to ownership of your own musical output.
+
+## Desktop and smartphone layout
+
+The same app URL automatically uses smartphone controls on touch-capable screens whose shorter side is at most 540 CSS pixels and longer side at most 1100 CSS pixels. Portrait and landscape use the same phone mode. Tablets, touch laptops and mouse-only desktops retain desktop controls; narrowing a desktop window does not turn it into a phone.

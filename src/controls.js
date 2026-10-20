@@ -400,6 +400,8 @@ function enhanceScroll(element) {
     tracks,
     baseRight: parseFloat(getComputedStyle(element).paddingRight) || 0,
     baseBottom: parseFloat(getComputedStyle(element).paddingBottom) || 0,
+    baseTop: parseFloat(getComputedStyle(element).paddingTop) || 0,
+    originalTop: element.style.paddingTop,
     originalRight: element.style.paddingRight,
     originalBottom: element.style.paddingBottom,
     observer,
@@ -431,6 +433,7 @@ function syncScrollbars() {
       scrolls.delete(element);
       continue;
     }
+    const pianoTop = element.id === "keyboard-scroll" && document.body.classList.contains("phone-ui");
     const coarse = matchMedia("(pointer: coarse)").matches;
     const thickness = ((coarse ? 10 : 8) * 2) / 3;
     const hasX =
@@ -441,7 +444,7 @@ function syncScrollbars() {
     if (element.id !== "program-ribbon") {
       for (const [axis, overflow, base, original] of [
         ["Right", hasY, metadata.baseRight, metadata.originalRight],
-        ["Bottom", hasX, metadata.baseBottom, metadata.originalBottom],
+        [pianoTop ? "Top" : "Bottom", hasX, pianoTop ? metadata.baseTop : metadata.baseBottom, pianoTop ? metadata.originalTop : metadata.originalBottom],
       ]) {
         if (axis === "Right" && element.id === "table-wrap") continue;
         const value =
@@ -453,12 +456,15 @@ function syncScrollbars() {
     const ownerDialog = element.closest("dialog[open]");
     const modal = Boolean(ownerDialog?.matches(":modal"));
     const r = element.getBoundingClientRect();
+    const trackStyle = getComputedStyle(element);
+    const insetLeft = pianoTop ? parseFloat(trackStyle.getPropertyValue("--piano-track-left")) || 0 : 0;
+    const insetRight = pianoTop ? parseFloat(trackStyle.getPropertyValue("--piano-track-right")) || 0 : 0;
     for (const { track, thumb, axis } of tracks) {
       const extent = axis === "x" ? element.scrollWidth : element.scrollHeight,
         visible = axis === "x" ? element.clientWidth : element.clientHeight,
         size = Math.max(
           0,
-          (axis === "x" ? r.width : r.height) -
+          (axis === "x" ? r.width - insetLeft - insetRight : r.height) -
             ((axis === "x" ? hasY : hasX) ? thickness + 1 : 0) -
             2,
         );
@@ -493,10 +499,10 @@ function syncScrollbars() {
         track.style.zIndex = String((Number.isFinite(layer) ? layer : 100) + 1);
       } else track.style.zIndex = "";
       track.style.left =
-        (axis === "x" ? r.left : r.right - thickness - 1) + "px";
+        (axis === "x" ? r.left + insetLeft : r.right - thickness - 1) + "px";
       track.style.top =
         (axis === "x"
-          ? element.id === "program-ribbon"
+          ? pianoTop ? r.top + 1 : element.id === "program-ribbon"
             ? r.bottom + 1
             : r.bottom - thickness - 1
           : r.top) + "px";

@@ -23,27 +23,12 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: npm ci
       - run: npm test
-      - uses: actions/setup-go@v7
-        with:
-          go-version: '1.27.2'
-          cache-dependency-path: tools/launcher/go.mod
-      - run: sh scripts/build-launchers.sh
-      - run: npm run build:release
-        env:
-          SAMPLER_BUILD_VERSION: 0.2.30
+      - run: npm run build:release -- --web-only
       - name: Archive this numbered build as a release
+        continue-on-error: true
         run: node scripts/publish-release.mjs
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          SAMPLER_BUILD_VERSION: 0.2.30
-      - name: Create identical desktop and mobile builds
-        run: |
-          rm -rf dist/desktop dist/mobile dist/web/desktop dist/web/mobile
-          cp -R dist/web dist/desktop
-          cp -R dist/web dist/mobile
-          mkdir -p dist/web/desktop dist/web/mobile
-          cp -R dist/desktop/. dist/web/desktop/
-          cp -R dist/mobile/. dist/web/mobile/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist/web

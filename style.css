@@ -2196,3 +2196,110 @@ textarea,
 .storagebar > .audio-tools > #enable-audio {
   display: none;
 }
+
+/* Smartphone piano fills the viewport edges; its native scrollbar sits above keys. */
+.phone-ui .keyboard-panel {
+  margin-inline: -12px;
+}
+.phone-ui #keyboard-scroll {
+  border-radius: 0;
+}
+.phone-ui .keyboard-panel .statusline {
+  margin-inline: 12px;
+}
+.phone-ui .keyboard-panel:not(.is-folded) #keyboard-scroll {
+  height: calc(var(--piano-height, 132px) + 8px);
+}
+.phone-ui #keyboard-scroll::-webkit-scrollbar { height: 6px; }
+@media (max-height: 620px) {
+  .phone-ui .keyboard-panel { margin-inline: -8px; }
+  .phone-ui .keyboard-panel .statusline { margin-inline: 8px; }
+}
+
+@media (orientation: portrait) {
+  .phone-ui #sampler {
+    padding-top: env(safe-area-inset-top, 47px);
+  }
+  .phone-ui #landing {
+    padding-top: calc(env(safe-area-inset-top, 47px) + 24px);
+  }
+}
+
+/* Keep an identical scrollbar lane in Play and Move; keys stay bottom-aligned. */
+.phone-ui #keyboard-scroll {
+  padding-top: 8px !important;
+  padding-bottom: 0 !important;
+}
+
+/* Smartphone landscape: only the notch side reserves a table inset. */
+@media (orientation: landscape) {
+  .phone-ui .samples-panel {
+    margin-left: max(0px, calc(env(safe-area-inset-left, 0px) - 8px));
+    margin-right: max(0px, calc(env(safe-area-inset-right, 0px) - 8px));
+  }
+  .phone-ui .program-header {
+    padding-left: max(24px, env(safe-area-inset-left, 0px));
+    padding-right: max(24px, env(safe-area-inset-right, 0px));
+  }
+  .phone-ui .keyboard-panel .statusline {
+    margin-left: calc(8px + env(safe-area-inset-left, 0px));
+    margin-right: calc(8px + env(safe-area-inset-right, 0px));
+  }
+}
+
+.phone-ui .program-header > #panic {
+  flex: 0 0 28px;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  align-self: flex-start;
+  padding: 4px;
+  color: var(--accent);
+}
+.phone-ui #panic svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.phone-ui #settings-update-slot #app-update {
+  width: auto;
+  min-width: 110px;
+  position: static;
+  transform: none;
+}
+
+.phone-ui #panic svg { color: #f08073; }
+.phone-ui .settings-diagnostics {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.phone-ui .settings-diagnostics .app-version { font-size: inherit; }
+.phone-ui .keyboard-panel .piano-info { flex: 1; }
+.phone-ui #keyboard-scroll {
+  --piano-track-left: env(safe-area-inset-left, 0px);
+  --piano-track-right: env(safe-area-inset-right, 0px);
+}
+.phone-ui .settings-diagnostics > * {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+/* Popup titles and close controls stay visible as their contents scroll. */
+.phone-ui dialog > .dialog-header,
+.phone-ui dialog > header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--panel);
+  isolation: isolate;
+}

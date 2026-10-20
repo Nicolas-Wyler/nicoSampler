@@ -1,3 +1,4 @@
+import { smartphoneUI } from "./device-ui.js";
 import { installPageZoomGuard } from "./page-gestures.js";
 import { COLOR_PALETTE } from "./key-colors.js";
 import { findFreeKeyBlock, hasAssignedKeys } from "./auto-assignment.js";
@@ -116,13 +117,36 @@ const audio = new AudioController(audioEvent),
 const current = () =>
     state.programs.find((p) => p.id === state.current) ?? state.programs[0],
   selected = () => current().samples.find((s) => s.id === current().selected);
+let debuggerChannel = null, debuggerSyncPending = false;
 const rowSelection = new RowSelection(),
   auditions = new Map();
 const selectedIds = () => rowSelection.reconcile(current());
-const touchSelectionUI = /iPhone|iPod|Android.*Mobile/i.test(
-  navigator.userAgent,
-  ) || location.pathname.includes("/mobile/");
+const touchSelectionUI = smartphoneUI();
 document.body.classList.toggle("phone-ui", touchSelectionUI);
+if (touchSelectionUI) {
+  const panicButton = $("panic");
+  panicButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8Z"/><path d="M12 7v6"/><circle cx="12" cy="17" r=".8"/></svg>';
+  panicButton.title = "Panic · Stop all sounds";
+  panicButton.setAttribute("aria-label", "Panic · Stop all sounds");
+  const master = document.querySelector('.program-header .master');
+  master.before(panicButton);
+  const diagnostics = document.createElement("div");
+  diagnostics.className = "settings-diagnostics";
+  diagnostics.setAttribute("aria-label", "Sampler status");
+  for (const selector of ["#status", "#engine-status", "[data-app-version]", "#base-latency", "#save-status"]) {
+    const item = document.querySelector('.piano-info ' + selector);
+    if (item) diagnostics.append(item);
+  }
+  document.querySelector('#sampler-settings .settings-fields').prepend(diagnostics);
+  const heading = document.querySelector('.samples-panel > .panel-heading');
+  const settings = document.querySelector('#sampler-settings .settings-fields');
+  if (heading && settings) {
+    heading.querySelector('h1').prepend(document.createTextNode('Samples · '));
+    heading.setAttribute('aria-label', 'Sample count and source storage');
+    settings.prepend(heading);
+  }
+}
+
 const storedBytes = () => audioBytes(state.programs, state.takes ?? []);
 const projectedBytes = (audio, replacing = null, source = null) =>
   audioBytes(state.programs, state.takes ?? [], audio, replacing, source);
@@ -388,6 +412,7 @@ function touch(p = current()) {
 function changed() {
   approvedClose = false;
   dirtyVersion++;
+  publishDebuggerState();
   $("save-status").textContent = "Saving…";
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => persist(), 500);
@@ -4129,7 +4154,7 @@ async function boot() {
           fitMarkers(s);
         }
       for (let i = 0; i < clean.programs.length; i++) {
-        const legacyEmpty = isLegacyEmptyProgram(saved.programs[i]);
+        const legacyEmpty = saved.programs[i].landing === undefined && isLegacyEmptyProgram(saved.programs[i]);
         clean.programs[i].landing =
           saved.programs[i].landing === true || legacyEmpty;
         if (legacyEmpty) {
@@ -4747,3 +4772,35 @@ window.addEventListener("pagehide", () => {
 window.addEventListener("pageshow", () => {
   if (ui.phonePiano) paintKeyboard();
 });
+
+// Local debugger waits for the normal recovery save before reloading source edits.
+window.addEventListener("debugger-before-reload", event => {
+  event.detail?.waitUntil?.((async()=>{
+    await persist();
+    if(savedVersion !== dirtyVersion) throw Error("Debugger reload stopped: project save failed");
+  })());
+});
+
+// Opt-in local preview adapter; no channel is created in the hosted application.
+function publishDebuggerState() {
+  if (!debuggerChannel || debuggerSyncPending) return;
+  debuggerSyncPending = true;
+  queueMicrotask(() => {
+    debuggerSyncPending = false;
+    debuggerChannel.postMessage({type:"state",state:structuredClone(state)});
+  });
+}
+if (window.__PWA_DEVICE_DEBUGGER__) {
+  debuggerChannel = new BroadcastChannel("nico-debugger-project");
+  debuggerChannel.onmessage = async event => {
+    if (event.data?.type === "request") {publishDebuggerState();return;}
+    if (event.data?.type !== "state") return;
+    clearTimeout(saveTimer);
+    state = event.data.state;
+    dirtyVersion++;
+    restoreSavedSettings();
+    paint();
+    await audio.syncProgram(current());
+    void persist();
+  };
+}

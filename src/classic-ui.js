@@ -1,3 +1,4 @@
+import { smartphoneUI } from "./device-ui.js";
 import { noteName, assigned, clamp } from "./model.js";
 import { playbackParts, playbackMode } from "./workflows.js";
 import { createZoomInertia } from "./zoom-inertia.js";
@@ -52,14 +53,10 @@ export class ClassicUI {
     this.cols = document.getElementById("table-cols");
     this.piano = document.getElementById("keyboard");
     this.keyboardScroll = document.getElementById("keyboard-scroll");
-    this.keyboardMinZoom = /iPhone|iPod/i.test(navigator.userAgent)
+    this.keyboardMinZoom = smartphoneUI()
       ? 75 / 14
       : 1;
-    // The mobile deployment intentionally uses the iOS interaction profile
-    // on every phone/tablet OS so controls and gestures remain consistent.
-    this.phonePiano =
-      /iPhone|iPod/i.test(navigator.userAgent) ||
-      location.pathname.includes("/mobile/");
+    this.phonePiano = smartphoneUI();
     this.externalKeyboardSeen = !this.phonePiano;
     this.pianoTouchMode = "play";
     this.playPointers = new Map();

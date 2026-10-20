@@ -1,3 +1,4 @@
+import { smartphoneUI } from "./device-ui.js";
 import { APP_VERSION } from "./version.js";
 document.title = `nicoSampler · v${APP_VERSION}`;
 document.querySelectorAll("[data-app-version]").forEach((element) => {
@@ -5,6 +6,27 @@ document.querySelectorAll("[data-app-version]").forEach((element) => {
 });
 const badge = document.getElementById("offline-status");
 const button = document.getElementById("app-update");
+let badgeSwipe = null;
+badge.style.touchAction = "none";
+badge.addEventListener("pointerdown", event => {
+  badgeSwipe = { id: event.pointerId, x: event.clientX, y: event.clientY };
+  if (event.isTrusted) badge.setPointerCapture(event.pointerId);
+});
+badge.addEventListener("pointermove", event => {
+  if (!badgeSwipe || badgeSwipe.id !== event.pointerId) return;
+  const dy = event.clientY - badgeSwipe.y;
+  if (dy < -22 && Math.abs(dy) > Math.abs(event.clientX - badgeSwipe.x)) {
+    badgeSwipe = null;
+    const animation = badge.animate([
+      {transform:"translateX(-50%) translateY(0)",opacity:1},
+      {transform:"translateX(-50%) translateY(-90px)",opacity:0}
+    ], {duration:160,easing:"ease-out"});
+    animation.onfinish = () => {badge.hidden = true;};
+    event.preventDefault();
+  }
+});
+for (const type of ["pointerup", "pointercancel"]) badge.addEventListener(type, () => { badgeSwipe = null; });
+
 const workerURL = new URL("../sw.js", import.meta.url);
 let registration,
   preparing = false,
@@ -12,6 +34,13 @@ let registration,
   updating = false,
   hideTimer;
 function placeButton() {
+  const phone = smartphoneUI();
+  if (phone) {
+    document.getElementById("settings-update-control").hidden = false;
+    button.classList.remove("landing-update");
+    document.getElementById("settings-update-slot").append(button);
+    return;
+  }
   const main = document.getElementById("sampler");
   const landing = main.hidden;
   button.classList.toggle("landing-update", landing);
@@ -167,6 +196,13 @@ button.addEventListener("click", () => {
 });
 async function prepare() {
   if (preparing) return;
+  if (window.__PWA_DEVICE_DEBUGGER__) {
+    badge.hidden = false;
+    badge.textContent = `nicoSampler v${APP_VERSION} · Local preview updated`;
+    setTimeout(() => { badge.hidden = true; }, 1200);
+    show("Local source · automatic reload");
+    return;
+  }
   preparing = true;
   show(navigator.onLine ? "Checking…" : "Offline");
   badge.hidden = false;
@@ -195,7 +231,7 @@ async function prepare() {
     };
     setTimeout(() => {
       if (!badge.dataset.error) badge.hidden = true;
-    }, 12000);
+    }, 1500);
   } catch (error) {
     if (!registration)
       show(navigator.onLine ? "Update check unavailable" : "Offline");

@@ -1,3 +1,4 @@
+import { smartphoneUI } from "./device-ui.js";
 import { RATE } from "./model.js";
 import { RowSelection } from "./selection.js";
 import { setRowPreviewIcon } from "./classic-ui.js";
@@ -47,9 +48,7 @@ export class RecordedTakesTable {
   render() {
     const selectButton = document.getElementById("takes-select");
     if (selectButton) {
-      selectButton.hidden = !/iPhone|iPod|Android.*Mobile/i.test(
-        navigator.userAgent,
-      );
+      selectButton.hidden = !smartphoneUI();
       selectButton.textContent = this.selection.mode ? "Done" : "Select";
       selectButton.disabled = this.api.locked();
       selectButton.setAttribute("aria-pressed", String(this.selection.mode));
