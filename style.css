@@ -46,7 +46,7 @@ button {
   cursor: pointer;
   white-space: nowrap;
 }
-button:hover {
+button:not(.piano-key):hover {
   background: #354632;
   border-color: #819b70;
 }
@@ -1408,13 +1408,13 @@ dialog.editor[open]:not(:modal) {
   margin-left: 4px;
 }
 
-/* Program tabs remain unobscured until the ribbon actually scrolls. */
-.custom-scrollbar.program-scrollbar {
+/* Scroll tracks fade after inactivity without changing reserved layout space. */
+.custom-scrollbar {
   opacity: 0;
   pointer-events: none;
-  transition: opacity 150ms ease;
+  transition: opacity 200ms ease;
 }
-.custom-scrollbar.program-scrollbar.is-scrolling {
+.custom-scrollbar.is-scrolling {
   opacity: 1;
   pointer-events: auto;
 }

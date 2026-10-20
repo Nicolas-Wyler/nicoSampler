@@ -330,22 +330,20 @@ function enhanceRotary(input) {
 }
 function enhanceScroll(element) {
   if (scrolls.has(element)) return;
-  const autoHide = element.id === "program-ribbon";
   let activityTimer = null,
     dragging = 0;
   function reveal() {
-    if (!autoHide) return;
     clearTimeout(activityTimer);
     for (const { track } of tracks) track.classList.add("is-scrolling");
     if (!dragging)
       activityTimer = setTimeout(() => {
         for (const { track } of tracks) track.classList.remove("is-scrolling");
-      }, 700);
+      }, 2500);
   }
   const tracks = ["x", "y"].map((axis) => {
     const track = document.createElement("div");
     track.className =
-      "custom-scrollbar " + axis + (autoHide ? " program-scrollbar" : "");
+      "custom-scrollbar " + axis + (element.id === "program-ribbon" ? " program-scrollbar" : "");
     const thumb = document.createElement("div");
     thumb.className = "custom-scroll-thumb";
     track.append(thumb);
@@ -373,10 +371,12 @@ function enhanceScroll(element) {
         thumb.removeEventListener("pointermove", move);
         thumb.removeEventListener("pointerup", done);
         thumb.removeEventListener("pointercancel", done);
+        thumb.removeEventListener("lostpointercapture", done);
       };
       thumb.addEventListener("pointermove", move);
       thumb.addEventListener("pointerup", done);
       thumb.addEventListener("pointercancel", done);
+      thumb.addEventListener("lostpointercapture", done);
     });
     track.addEventListener("pointerdown", (e) => {
       if (e.target !== track) return;
@@ -409,7 +409,12 @@ function enhanceScroll(element) {
     cleanup: () => clearTimeout(activityTimer),
   });
   element.addEventListener("scroll", onScroll, { passive: true });
+  element.addEventListener("pointerdown", reveal, { passive: true });
+  element.addEventListener("pointerenter", reveal, { passive: true });
+  element.addEventListener("focusin", reveal, { passive: true });
+  element.addEventListener("toggle", reveal, { passive: true });
   observer.observe(element);
+  reveal();
 }
 let scrollFrame = null;
 function scheduleScrollbars() {
