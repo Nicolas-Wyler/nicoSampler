@@ -141,9 +141,10 @@ class SamplerProcessor extends AudioWorkletProcessor {
         const notes = [];
         for (let i = 0; i < 128; i++)
           if (this.engine.api.note_active(i)) notes.push(i);
-        const positions = {};
+        const positions = {}, samplePeaks = {};
         for (const [slot, id] of this.mapping) {
           const p = this.engine.api.position(slot);
+          samplePeaks[id] = this.engine.api.sample_peak(slot);
           if (p >= 0) positions[id] = p;
         }
         this.port.postMessage({
@@ -153,6 +154,7 @@ class SamplerProcessor extends AudioWorkletProcessor {
           voices: this.engine.api.active_voices(),
           notes,
           positions,
+          samplePeaks,
         });
       }
     } catch (error) {

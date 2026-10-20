@@ -84,3 +84,13 @@ export function updateMeters(outputPeak = 0, inputPeak = 0) {
     "Recording input level",
   );
 }
+
+// Twelve vertical segments, bottom-to-top from -55 dBFS through clipping at 0 dBFS.
+export function renderRowMeter(element, peak) {
+  if (!element) return;
+  const db = amplitudeDb(peak);
+  [...element.children].forEach((segment, index) => {
+    segment.classList.toggle("lit", db >= -index * 5 && Number(peak) > 0);
+  });
+  element.setAttribute("aria-valuenow", String(db));
+}

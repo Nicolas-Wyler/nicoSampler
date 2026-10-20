@@ -28,7 +28,7 @@ import {
   cutoffPosition,
   cutoffValue,
 } from "./filter-ui.js";
-import { updateMeters, dbPosition, positionDb } from "./meters.js";
+import { updateMeters, dbPosition, positionDb, renderRowMeter } from "./meters.js";
 import { initControls, syncControls } from "./controls.js";
 import { RowSelection, moveRows } from "./selection.js";
 import { ClassicUI, setRowPreviewIcon } from "./classic-ui.js";
@@ -3991,9 +3991,10 @@ function audioEvent(m) {
     paintPressed();
     document
       .querySelectorAll("[data-id]")
-      .forEach((el) =>
-        el.classList.toggle("playing", m.positions[el.dataset.id] != null),
-      );
+      .forEach((el) => {
+        el.classList.toggle("playing", m.positions[el.dataset.id] != null);
+        renderRowMeter(el.querySelector(".row-activity-bar"), m.samplePeaks?.[el.dataset.id] ?? 0);
+      });
     wave.position =
       m.positions["trim-preview"] ?? m.positions[selected()?.id] ?? -1;
     wave.draw();

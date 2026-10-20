@@ -1212,9 +1212,13 @@ export class ClassicUI {
       };
       channels.append(mute, solo);
       const led = element("span", "activity row-activity-bar");
-      led.setAttribute("aria-label", "Sample playback activity");
+      led.setAttribute("aria-label", "Sample output level");
+      led.setAttribute("role", "meter");
+      led.setAttribute("aria-valuemin", "-60");
+      led.setAttribute("aria-valuemax", "0");
+      led.setAttribute("aria-valuenow", "-60");
       for (let segment = 0; segment < 12; segment++) {
-        const light = element("span");
+        const light = element("span", segment === 0 ? "red" : segment < 3 ? "amber" : "green");
         light.setAttribute("aria-hidden", "true");
         led.append(light);
       }

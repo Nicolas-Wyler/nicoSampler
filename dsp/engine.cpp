@@ -11,6 +11,7 @@ using std::min;
 static constexpr int MAX_SAMPLES = 513, MAX_VOICES = 128, MAX_FRAMES = 2048;
 static float rate = 44100, master = 1.f, peak = 0;
 static float outL[MAX_FRAMES], outR[MAX_FRAMES];
+static float rowPeak[MAX_SAMPLES] = {}, rowL[MAX_SAMPLES], rowR[MAX_SAMPLES];
 static float inputL[MAX_FRAMES], inputR[MAX_FRAMES], auxL[MAX_FRAMES],
     auxR[MAX_FRAMES], monitorGain = 0;
 static float limiterEnvelope = 0, limiterRelease = 0, meterRelease = 0;
@@ -189,12 +190,14 @@ API void panic() {
   delays[0].clear();
   delays[1].clear();
   peak = 0;
+  memset(rowPeak, 0, sizeof(rowPeak));
   limiterEnvelope = 0;
   limiterHold = 0;
 }
 API void remove_sample(int id) {
   if (id < 0 || id >= MAX_SAMPLES)
     return;
+  rowPeak[id] = 0;
   for (auto &v : voices)
     if (v.sample == id)
       v.active = false;
@@ -410,6 +413,7 @@ API int active_voices() {
   return n;
 }
 API float output_peak() { return peak; }
+API float sample_peak(int id) { return id >= 0 && id < MAX_SAMPLES ? rowPeak[id] : 0; }
 API int note_active(int n) {
   for (auto &v : voices)
     if (v.active && !v.retired && v.note == n)
@@ -430,7 +434,16 @@ API void render(int frames) {
   for (auto &v : voices)
     if (v.active)
       updateFilter(v, samples[v.sample], frames);
+  int activeSamples[MAX_SAMPLES], activeCount = 0;
+  bool seen[MAX_SAMPLES] = {};
+  const float rowDecay = std::exp(-frames / (.250f * rate));
+  for (auto &value : rowPeak) value *= rowDecay;
+  for (const auto &v : voices) if (v.active && !seen[v.sample]) {
+    seen[v.sample] = true;
+    activeSamples[activeCount++] = v.sample;
+  }
   for (int frame = 0; frame < frames; frame++) {
+    for (int i = 0; i < activeCount; i++) rowL[activeSamples[i]] = rowR[activeSamples[i]] = 0;
     float dry[2] = {}, bus1[4] = {}, bus2[2] = {};
     for (auto &v : voices) {
       if (!v.active)
@@ -496,6 +509,7 @@ API void render(int frames) {
         y *= c == 0 ? s.panLeft : s.panRight;
         if (s.muted)
           y = 0;
+        (c == 0 ? rowL[v.sample] : rowR[v.sample]) += y;
         dry[c] += y;
         bus1[c] += y * s.fx1;
         bus1[c + 2] += y * s.fx1 * s.fx2;
@@ -507,6 +521,10 @@ API void render(int frames) {
         v.stopAge++;
       if (v.releaseAge >= 0)
         v.releaseAge++;
+    }
+    for (int i = 0; i < activeCount; i++) {
+      const int id = activeSamples[i];
+      rowPeak[id] = max(rowPeak[id], max(std::abs(rowL[id]), std::abs(rowR[id])));
     }
     float wet1[4], wet2[2];
     delays[0].process(bus1, wet1);

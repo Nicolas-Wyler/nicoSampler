@@ -603,9 +603,9 @@ tfoot .add-sample-row td {
   border-radius: 1px;
   transition: background-color 70ms linear;
 }
-#sample-table tr.playing .row-activity-bar > span {
-  background: var(--accent);
-}
+#sample-table .row-activity-bar > .green.lit { background: #a9df7f; }
+#sample-table .row-activity-bar > .amber.lit { background: #e4af55; }
+#sample-table .row-activity-bar > .red.lit { background: #ee7065; }
 
 /* Row actions are a separate fixed column; Sample contains only the name. */
 #sample-grid .row-controls-cell {
