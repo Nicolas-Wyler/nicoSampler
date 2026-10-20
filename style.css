@@ -2324,3 +2324,18 @@ textarea,
   visibility: hidden;
   pointer-events: none;
 }
+
+/* The document is an app viewport, never a scroll surface (including iOS bounce). */
+html, body {
+  overscroll-behavior: none;
+}
+body {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+#table-wrap, #keyboard-scroll, #program-ribbon, dialog,
+.takes-table-wrap, .custom-options {
+  overscroll-behavior: contain;
+}

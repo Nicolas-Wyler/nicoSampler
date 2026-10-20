@@ -20,10 +20,23 @@ export function isPageZoomGesture(event) {
     ["+", "-", "=", "0"].includes(event.key)
   );
 }
+/** Only actual overflow containers may consume browser scrolling. */
+export function isInsideScrollSection(element, styleFor = el => getComputedStyle(el)) {
+  for (let el = element; el?.nodeType === 1; el = el.parentElement) {
+    if (el.tagName === "BODY" || el.tagName === "HTML") return false;
+    const style = styleFor(el);
+    if ((/auto|scroll/.test(style.overflowY) && el.scrollHeight > el.clientHeight + 1) ||
+        (/auto|scroll/.test(style.overflowX) && el.scrollWidth > el.clientWidth + 1)) return true;
+  }
+  return false;
+}
 export function installPageZoomGuard(target = document) {
   if (installed.has(target)) return installed.get(target);
   const guard = (event) => {
-    if (event.cancelable && isPageZoomGesture(event)) event.preventDefault();
+    if (!event.cancelable) return;
+    const pageScroll = (event.type === "touchmove" || event.type === "wheel") &&
+      event.target?.nodeType === 1 && !isInsideScrollSection(event.target);
+    if (isPageZoomGesture(event) || pageScroll) event.preventDefault();
   };
   const options = { capture: true, passive: false };
   for (const type of types) target.addEventListener(type, guard, options);

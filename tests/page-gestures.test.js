@@ -79,3 +79,17 @@ test("Safari gesture events and browser zoom shortcuts are guarded; installation
   target.dispatchEvent(after);
   assert.equal(after.defaultPrevented, false);
 });
+
+test('scrolling is confined to overflowing sections rather than the document', async () => {
+  const {isInsideScrollSection} = await import('../src/page-gestures.js');
+  const root={nodeType:1,tagName:'BODY',parentElement:null,scrollHeight:2000,clientHeight:800};
+  const panel={nodeType:1,tagName:'DIV',parentElement:root,scrollHeight:1200,clientHeight:300,scrollWidth:300,clientWidth:300};
+  const child={nodeType:1,tagName:'BUTTON',parentElement:panel,scrollHeight:20,clientHeight:20,scrollWidth:20,clientWidth:20};
+  const styles=el=>({overflowY:el===panel?'auto':'hidden',overflowX:'hidden'});
+  assert.equal(isInsideScrollSection(child,styles),true);
+  assert.equal(isInsideScrollSection(root,()=>({overflowY:'auto'})),false);
+  panel.scrollHeight=300;
+  assert.equal(isInsideScrollSection(child,styles),false);
+  panel.scrollWidth=900;
+  assert.equal(isInsideScrollSection(child,el=>({overflowY:'hidden',overflowX:el===panel?'auto':'hidden'})),true);
+});
