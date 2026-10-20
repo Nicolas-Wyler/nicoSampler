@@ -85,12 +85,19 @@ export function updateMeters(outputPeak = 0, inputPeak = 0) {
   );
 }
 
-// Twelve vertical segments, bottom-to-top from -55 dBFS through clipping at 0 dBFS.
-export function renderRowMeter(element, peak) {
+// Top-to-bottom: two red, three amber, seven green LEDs on a dBFS scale.
+const ROW_THRESHOLDS = [0, -3, -6, -9, -12, -18, -24, -30, -36, -42, -48, -55];
+const rowClipUntil = new WeakMap();
+export function rowMeterColor(index) {
+  return index < 2 ? "red" : index < 5 ? "amber" : "green";
+}
+export function renderRowMeter(element, peak, now = performance.now()) {
   if (!element) return;
   const db = amplitudeDb(peak);
+  if (Number.isFinite(Number(peak)) && Number(peak) >= 1) rowClipUntil.set(element, now + 1000);
   [...element.children].forEach((segment, index) => {
-    segment.classList.toggle("lit", db >= -index * 5 && Number(peak) > 0);
+    const clippingHold = index === 0 && now < (rowClipUntil.get(element) ?? 0);
+    segment.classList.toggle("lit", clippingHold || (Number(peak) > 0 && db >= ROW_THRESHOLDS[index]));
   });
   element.setAttribute("aria-valuenow", String(db));
 }

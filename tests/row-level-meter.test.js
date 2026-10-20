@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {WasmEngine,interleave} from '../src/wasm-engine.js';
 import {sample,fitMarkers} from '../src/model.js';
-import {renderRowMeter} from '../src/meters.js';
+import {renderRowMeter,rowMeterColor} from '../src/meters.js';
 const module=await WebAssembly.compile(fs.readFileSync(new URL('../src/engine.wasm',import.meta.url)));
 function fixture(){
  const e=new WasmEngine(module),rows=[];
@@ -23,7 +23,18 @@ test('mute meters decay through silence and Panic clears immediately',()=>{
 test('row LED thresholds distinguish silence, quiet signal, amber and clipping',()=>{
  const lit=new Set(),attrs={};const element={children:Array.from({length:12},(_,i)=>({classList:{toggle:(_,on)=>on?lit.add(i):lit.delete(i)}})),setAttribute:(k,v)=>attrs[k]=v};
  renderRowMeter(element,0);assert.equal(lit.size,0);
- renderRowMeter(element,.01);assert.equal(lit.size,4);
- renderRowMeter(element,.5);assert.equal(lit.size,10);assert(!lit.has(0));assert(lit.has(2));
+ renderRowMeter(element,.01);assert.equal(lit.size,3);
+ renderRowMeter(element,.5);assert.equal(lit.size,9);assert(!lit.has(0));assert(lit.has(3));
  renderRowMeter(element,1);assert.equal(lit.size,12);assert(lit.has(0));assert.equal(attrs['aria-valuenow'],'0');
+});
+
+test('row has seven green, three amber and two red LEDs; clip cap holds one second',()=>{
+ const colors=Array.from({length:12},(_,i)=>rowMeterColor(i));
+ for(const [color,count] of [['green',7],['amber',3],['red',2]])assert.equal(colors.filter(c=>c===color).length,count);
+ const lit=new Set();const el={children:Array.from({length:12},(_,i)=>({classList:{toggle:(_,on)=>on?lit.add(i):lit.delete(i)}})),setAttribute(){}};
+ renderRowMeter(el,.9,0);assert(!lit.has(0));assert(lit.has(1));
+ renderRowMeter(el,1.1,10);assert(lit.has(0));
+ renderRowMeter(el,0,500);assert.deepEqual([...lit],[0]);
+ renderRowMeter(el,0,1011);assert.equal(lit.size,0);
+ const other={...el};renderRowMeter(other,0,500);assert.equal(lit.size,0,'hold stays isolated to its own meter');
 });

@@ -1,3 +1,4 @@
+import { rowMeterColor } from "./meters.js";
 import { smartphoneUI } from "./device-ui.js";
 import { noteName, assigned, clamp } from "./model.js";
 import { playbackParts, playbackMode } from "./workflows.js";
@@ -1218,7 +1219,7 @@ export class ClassicUI {
       led.setAttribute("aria-valuemax", "0");
       led.setAttribute("aria-valuenow", "-60");
       for (let segment = 0; segment < 12; segment++) {
-        const light = element("span", segment === 0 ? "red" : segment < 3 ? "amber" : "green");
+        const light = element("span", rowMeterColor(segment));
         light.setAttribute("aria-hidden", "true");
         led.append(light);
       }
