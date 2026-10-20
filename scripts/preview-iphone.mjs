@@ -30,6 +30,7 @@ function installMouseAsTouch(){
   if(!d || d.__mouseTouchInstalled) return;
   d.__mouseTouchInstalled=true;
   let active=false;
+  let keyboardDrag=null;
   const forward=(type,e)=>{
     if(type==='pointerdown') active=true;
     if(type==='pointerup' || type==='pointercancel') active=false;
@@ -40,6 +41,19 @@ function installMouseAsTouch(){
       pageX:e.pageX,pageY:e.pageY,pressure:type==='pointerup'?0:0.5});
     e.stopImmediatePropagation(); e.preventDefault(); t.dispatchEvent(p);
   };
+  d.addEventListener('pointerdown',e=>{
+    if(e.pointerType!=='touch') return;
+    const area=e.target.closest?.('#keyboard-scroll');
+    if(area && d.body.classList.contains('phone-ui'))
+      keyboardDrag={id:e.pointerId,x:e.clientX,scroll:area.scrollLeft,area};
+  },true);
+  d.addEventListener('pointermove',e=>{
+    if(!keyboardDrag || keyboardDrag.id!==e.pointerId) return;
+    keyboardDrag.area.scrollLeft=keyboardDrag.scroll-(e.clientX-keyboardDrag.x);
+    e.preventDefault(); e.stopImmediatePropagation();
+  },true);
+  d.addEventListener('pointerup',e=>{if(keyboardDrag?.id===e.pointerId) keyboardDrag=null},true);
+  d.addEventListener('pointercancel',e=>{if(keyboardDrag?.id===e.pointerId) keyboardDrag=null},true);
   for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])
     d.addEventListener(type,e=>{ if(e.pointerType==='mouse' && (active || type==='pointerdown')) forward(type,e); },true);
 }
