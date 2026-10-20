@@ -24,7 +24,27 @@ body{display:flex;flex-direction:column;align-items:center;padding:12px;gap:10px
 </style></head><body><header>${model} ${orientation} · ${viewport.width} × ${viewport.height} CSS px<br><span id="scale"></span> · local WebKit layout preview</header><div id="frame"><iframe title="iPhone sampler preview" src="/" allow="microphone; midi; clipboard-read; clipboard-write"></iframe></div><script>
 const frame=document.querySelector('#frame'),phone=document.querySelector('iframe');
 function fit(){const s=Math.max(.1,Math.min(.7,(innerWidth-32)/${viewport.width},(innerHeight-document.querySelector('header').offsetHeight-38)/${viewport.height}));frame.style.width=(${viewport.width}*s)+'px';frame.style.height=(${viewport.height}*s)+'px';phone.style.transform='scale('+s+')';document.querySelector('#scale').textContent=Math.round(s*100)+'% display scale';}
-addEventListener('resize',fit);fit();</script></body></html>`;
+addEventListener('resize',fit);fit();
+function installMouseAsTouch(){
+  const d=phone.contentDocument;
+  if(!d || d.__mouseTouchInstalled) return;
+  d.__mouseTouchInstalled=true;
+  let active=false;
+  const forward=(type,e)=>{
+    if(type==='pointerdown') active=true;
+    if(type==='pointerup' || type==='pointercancel') active=false;
+    const t=e.target;
+    const p=new PointerEvent(type,{bubbles:true,cancelable:true,composed:true,
+      pointerId:1,pointerType:'touch',isPrimary:true,button:e.button,buttons:e.buttons,
+      clientX:e.clientX,clientY:e.clientY,screenX:e.screenX,screenY:e.screenY,
+      pageX:e.pageX,pageY:e.pageY,pressure:type==='pointerup'?0:0.5});
+    e.stopImmediatePropagation(); e.preventDefault(); t.dispatchEvent(p);
+  };
+  for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])
+    d.addEventListener(type,e=>{ if(e.pointerType==='mouse' && (active || type==='pointerdown')) forward(type,e); },true);
+}
+phone.addEventListener('load',installMouseAsTouch); setTimeout(installMouseAsTouch,50);
+</script></body></html>`;
 const types = {
   ".html": "text/html",
   ".js": "text/javascript",
