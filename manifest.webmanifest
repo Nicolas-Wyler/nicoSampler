@@ -1,5 +1,5 @@
 {
-  "id": "./",
+  "id": "/nicoSampler/",
   "name": "nicoSampler",
   "short_name": "nicoSampler",
   "description": "A private sampler with a C++ audio engine, MIDI, recording and waveform editing.",

@@ -51,3 +51,7 @@ Commercial licensing requests can be made through this repository. No license ap
 ## Desktop and smartphone layout
 
 The same app URL automatically uses smartphone controls on touch-capable screens whose shorter side is at most 540 CSS pixels and longer side at most 1100 CSS pixels. Portrait and landscape use the same phone mode. Tablets, touch laptops and mouse-only desktops retain desktop controls; narrowing a desktop window does not turn it into a phone.
+
+## Installing alongside other GitHub Pages apps
+
+This app has a unique, stable manifest ID (`/nicoSampler/`) so Chrome can install it separately from other apps on `nicolas-wyler.github.io`. If an older installation opens the wrong app, open this project’s hosted URL and install it again after the update. Keep existing browser data and export important projects before removing any old shortcut; do not clear site storage, which is shared by apps on this origin.
